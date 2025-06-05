@@ -1,0 +1,5696 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de Bord Premium des Entreprises</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2canvas via CDN for downloading feature -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc; /* Light gray background */
+            color: #2d3748; /* Gray-800 for text */
+        }
+        .company-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out;
+            border-left: 4px solid transparent;
+        }
+        .company-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 14px rgba(0,0,0,0.07), 0 3px 6px rgba(0,0,0,0.05);
+        }
+        .company-card.selected {
+            background-color: #e6f0ff; /* Lighter blue for selection */
+            border-left-color: #3b82f6; /* Blue-500 */
+            color: #1e3a8a; /* Blue-800 for selected text */
+        }
+        #radarChartContainer {
+            min-height: 320px;
+            max-height: 480px;
+            position: relative;
+            padding: 10px; /* Add some padding around the chart */
+            background-color: #fff;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06);
+        }
+        .filter-select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); /* Gray-400 for arrow */
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            border-color: #d1d5db; /* Gray-300 border */
+        }
+        .filter-select:focus {
+            border-color: #3b82f6; /* Blue-500 focus */
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); /* Blue-500 focus ring */
+        }
+        .detail-item {
+            display: flex;
+            align-items: flex-start; /* Align items to the start for better multiline text */
+            gap: 0.6rem; 
+            padding: 0.35rem 0;
+        }
+        .detail-item svg {
+            flex-shrink: 0;
+            width: 1.1rem; /* 17.6px */
+            height: 1.1rem; /* 17.6px */
+            margin-top: 2px; /* Align icon nicely with first line of text */
+            color: #4f46e5; /* Indigo-600, more vibrant */
+        }
+        .stat-card {
+            background-color: white;
+            padding: 1.25rem; /* p-5 */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.04);
+            text-align: center;
+        }
+        .stat-card-title {
+            font-size: 0.8rem; /* Slightly smaller */
+            color: #6b7280; /* Gray-500 */
+            margin-bottom: 0.3rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .stat-card-value {
+            font-size: 1.75rem; /* text-2xl or 3xl */
+            font-weight: 700; /* bold */
+            color: #3b82f6; /* Blue-500 */
+        }
+
+        /* Styles for the downloaded image - applied dynamically */
+        .printable-fiche {
+            font-family: Arial, sans-serif; /* Standard font for better compatibility */
+            padding: 25px !important;
+            background-color: white !important;
+            border: 1px solid #ccc !important;
+            box-shadow: none !important; /* Remove shadow for print */
+            width: 800px !important; /* Fixed width for consistent PDF output */
+        }
+        .printable-fiche h3 {
+            font-size: 22px !important;
+            color: #111827 !important; /* Gray-900 */
+            text-align: center;
+            margin-bottom: 20px !important;
+            padding-bottom: 10px !important;
+            border-bottom: 2px solid #3b82f6 !important;
+        }
+        .printable-fiche .detail-item {
+            font-size: 12px !important;
+            margin-bottom: 6px !important;
+        }
+        .printable-fiche .detail-item strong {
+            color: #374151 !important; /* Gray-700 */
+            min-width: 150px; /* Ensure alignment of values */
+            display: inline-block;
+        }
+         .printable-fiche .detail-item svg {
+            color: #3b82f6 !important;
+            width: 14px !important;
+            height: 14px !important;
+        }
+        .printable-fiche #radarChartContainer { /* Chart specific styles for print */
+            margin-top: 20px !important;
+            border: 1px solid #eee !important;
+        }
+        .printable-fiche .grid { /* Simplify grid for printing */
+            display: block !important;
+        }
+        .printable-fiche .sm\:col-span-2 { /* Remove specific column spans for print */
+            grid-column: span 1 / span 1 !important;
+        }
+        /* Hide elements not needed for download */
+        .no-print { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-50 p-4 md:p-6">
+
+    <div class="container mx-auto max-w-screen-2xl">
+        <header class="mb-6 md:mb-8 py-4">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 text-center tracking-tight">
+                <span class="text-indigo-600">Pilot</span> Dashboard <span class="text-sm font-normal text-gray-500">TPE</span>
+            </h1>
+        </header>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+            <div class="stat-card">
+                <p class="stat-card-title">Total TPE</p>
+                <p id="totalCompaniesStat" class="stat-card-value">0</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-card-title">TPE Affichées</p>
+                <p id="displayedCompaniesStat" class="stat-card-value">0</p>
+            </div>
+             <div class="stat-card">
+                <p class="stat-card-title">Profil Dominant</p>
+                <p id="majorProfileStat" class="stat-card-value">-</p>
+            </div>
+            <div class="stat-card">
+                <p class="stat-card-title">Secteur Dominant</p>
+                <p id="majorSectorStat" class="stat-card-value">-</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-4 bg-white p-5 rounded-xl shadow-lg flex flex-col max-h-[calc(100vh-200px)]">
+                <div class="flex-shrink-0">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-1">Filtres & Recherche</h2>
+                    <p class="text-xs text-gray-500 mb-4">Affinez votre sélection d'entreprises.</p>
+                    
+                    <input type="text" id="searchCompany" class="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-400 text-sm shadow-sm" placeholder="Rechercher par nom...">
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label for="filterRegion" class="block text-xs font-medium text-gray-600 mb-0.5">Région:</label>
+                            <select id="filterRegion" class="filter-select w-full p-2.5 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm shadow-sm">
+                                <option value="">Toutes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filterSecteur" class="block text-xs font-medium text-gray-600 mb-0.5">Secteur:</label>
+                            <select id="filterSecteur" class="filter-select w-full p-2.5 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm shadow-sm">
+                                <option value="">Tous</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filterProfil" class="block text-xs font-medium text-gray-600 mb-0.5">Profil Digital:</label>
+                            <select id="filterProfil" class="filter-select w-full p-2.5 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm shadow-sm">
+                                <option value="">Tous</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filterStatut" class="block text-xs font-medium text-gray-600 mb-0.5">Statut Légal:</label>
+                            <select id="filterStatut" class="filter-select w-full p-2.5 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm shadow-sm">
+                                <option value="">Tous</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="filterCA" class="block text-xs font-medium text-gray-600 mb-0.5">Chiffre d'Affaires:</label>
+                            <select id="filterCA" class="filter-select w-full p-2.5 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm shadow-sm">
+                                <option value="">Tous</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label for="filterLangue" class="block text-xs font-medium text-gray-600 mb-0.5">Langue:</label>
+                            <select id="filterLangue" class="filter-select w-full p-2.5 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm shadow-sm">
+                                <option value="">Toutes</option>
+                            </select>
+                        </div>
+                    </div>
+                     <button id="resetFiltersButton" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors duration-150 ease-in-out mb-3 shadow hover:shadow-md">
+                        Réinitialiser Filtres
+                    </button>
+                </div>
+                
+                <div class="flex-grow overflow-y-auto border-t border-gray-200 pt-3">
+                    <div class="flex justify-between items-center mb-2 px-1">
+                        <h3 class="text-md font-semibold text-gray-700">Liste des TPE</h3>
+                        <span id="companyCount" class="text-xs font-semibold text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-full">0 affichées</span>
+                    </div>
+                    <ul id="companyList" class="space-y-1.5">
+                        <!-- Les entreprises seront injectées ici -->
+                    </ul>
+                </div>
+            </div>
+
+            <div class="lg:col-span-8 bg-white p-5 rounded-xl shadow-lg flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-4 pb-3 border-b border-gray-200">
+                    <h2 id="companyDetailTitle" class="text-xl lg:text-2xl font-semibold text-gray-800 mb-2 sm:mb-0">Détails de l'Entreprise</h2>
+                    <button id="downloadSheetButton" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow hover:shadow-md transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                        Télécharger Fiche
+                    </button>
+                </div>
+                
+                <!-- This div will be the one captured for download -->
+                <div id="ficheTPEForDownload" class="flex-grow"> 
+                    <div id="companyDetails" class="text-gray-700 min-h-[280px] mb-5"> 
+                        <p class="italic text-gray-500 p-4 text-center">Sélectionnez une entreprise dans la liste pour afficher ses détails et son profil.</p>
+                    </div>
+                    <div id="radarChartContainerWrapper" class="w-full mt-4"> <!-- Wrapper for chart container -->
+                         <div id="radarChartContainer" class="w-full">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- START: COLLER VOS DONNÉES JSON ICI ---
+        const rawData = [
+ {
+  "*": 203,
+  "Entreprise": "IGHOULOGE",
+  "Raison sociale - Définitive": "Ighouloge",
+  "nom du représentant": "Chaker amal",
+  "Langue": "Fr",
+  "n de téléphone": "0645778724",
+  "email": "Chakeramel@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Safi",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 7.833333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 51.666666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 10.5,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 37.2777777777778,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 204,
+  "Entreprise": "Ilm business",
+  "Raison sociale - Définitive": "ILM Business",
+  "nom du représentant": "المنصوري فاطمة",
+  "Langue": "Ar",
+  "n de téléphone": "0635748020",
+  "email": "ilmbusinness@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Safi",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 5.291666666666666,
+  "Statut": "SARL AU",
+  "Stratégie": 84.16666666666667,
+  "Culture & RH": 27.5,
+  "Relation Client": 32,
+  "Processus": 66.66666666666667,
+  "Technologies": 20,
+  "Sécurité & Données": 56.25,
+  "Moyenne globale ": 47.76388888888889,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 205,
+  "Entreprise": "Naoufal Selmani Photography",
+  "Raison sociale - Définitive": "Selmani - AE",
+  "nom du représentant": "Selmani Naoufal",
+  "Langue": "Fr",
+  "n de téléphone": "0660018595",
+  "email": "naoufalselmaniphotography@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Safi",
+  "Secteur": "Services",
+  "IS -5": 9.666666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 75,
+  "Culture & RH": 50,
+  "Relation Client": 55,
+  "Processus": 50,
+  "Technologies": 55,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 53.75,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 206,
+  "Entreprise": "Payprint.ma",
+  "Raison sociale - Définitive": "Payprint.ma - AE",
+  "nom du représentant": "Laqrafi walid",
+  "Langue": "Fr",
+  "n de téléphone": "0708855322",
+  "email": "Walidlaq@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Safi",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.916666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 75,
+  "Culture & RH": 100,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 54.666666666666664,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 208,
+  "Entreprise": "Smmtc",
+  "Raison sociale - Définitive": "SMMTC",
+  "nom du représentant": "Mahboub mohamed",
+  "Langue": "Fr",
+  "n de téléphone": "0644679846",
+  "email": "smmtc.safi@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Safi",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 5.666666666666667,
+  "Statut": "SARL AU",
+  "Stratégie": 36.666666666666664,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 34.02777777777778,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 10 et 50 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 209,
+  "Entreprise": "Ste de jardinage rachidi sarl au",
+  "Raison sociale - Définitive": "Jardinage Rachidi",
+  "nom du représentant": "yassin Rachidi",
+  "Langue": "Fr",
+  "n de téléphone": "0664381028",
+  "email": "rachidijardinage08@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Safi",
+  "Secteur": "Services",
+  "IS -5": 4.25,
+  "Statut": "SARL AU",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 23.5,
+  "Processus": 5,
+  "Technologies": 15.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 25.666666666666668,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 10 et 50 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 211,
+  "Entreprise": "تعاونية أمواج الخير للحلويات",
+  "Raison sociale - Définitive": "Coopérative Amwal Al Khair",
+  "nom du représentant": "Hamza Hachm",
+  "Langue": "Fr",
+  "n de téléphone": "0602861464",
+  "email": "amwaj.hachm@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Safi",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 8,
+  "Statut": "Coopérative",
+  "Stratégie": 5,
+  "Culture & RH": 50,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 15.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 26.166666666666668,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 213,
+  "Entreprise": "DDSS",
+  "Raison sociale - Définitive": "DDS",
+  "nom du représentant": "OUSSAMA AIT LAHCEN",
+  "Langue": "Fr",
+  "n de téléphone": "0663080572",
+  "email": "majddohour@gmail.com",
+  "Qualité du répondant": "Chargé(e) de la relation client",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Youssoufia",
+  "Secteur": "Services",
+  "IS -5": 7.083333333333333,
+  "Statut": "SARL",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 27.5,
+  "Processus": 50,
+  "Technologies": 15,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 33.75,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 219,
+  "Entreprise": "Zahira Dennoune",
+  "Raison sociale - Définitive": "Dennoune - AE",
+  "nom du représentant": "Zahra Dennoune",
+  "Langue": "Fr",
+  "n de téléphone": "0620500106",
+  "email": "denounne8@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Youssoufia",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9.25,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 67.5,
+  "Culture & RH": 75,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 47.083333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 221,
+  "Entreprise": "تعاونية ربابة افراح",
+  "Raison sociale - Définitive": "Coopérative Rababa Afrah",
+  "nom du représentant": "شريفي فؤاد",
+  "Langue": "Ar",
+  "n de téléphone": "0651660340",
+  "email": "almostachrikoune@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Youssoufia",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 8.375,
+  "Statut": "Coopérative",
+  "Stratégie": 52.5,
+  "Culture & RH": 75,
+  "Relation Client": 50,
+  "Processus": 100,
+  "Technologies": 70,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 64.16666666666667,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 223,
+  "Entreprise": "Agri Phyto consulting services",
+  "Raison sociale - Définitive": "Agri Phyto",
+  "nom du représentant": "El hatef younes",
+  "Langue": "Fr",
+  "n de téléphone": "0666596310",
+  "email": "Younes.elhatef@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Essaouira",
+  "Secteur": "Commerce",
+  "IS -5": 8.041666666666666,
+  "Statut": "SARL AU",
+  "Stratégie": 51.666666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 32,
+  "Processus": 50,
+  "Technologies": 35.5,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 40.69444444444444,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 237,
+  "Entreprise": "تعاونية الأناقة للخياطة و الطرز",
+  "Raison sociale - Définitive": "Coopérative Al Anaqa",
+  "nom du représentant": "اهريش سعاد",
+  "Langue": "Ar",
+  "n de téléphone": "0654602122",
+  "email": "bahannam17@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Essaouira",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9.333333333333332,
+  "Statut": "Coopérative",
+  "Stratégie": 58.333333333333336,
+  "Culture & RH": 50,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 37.88888888888889,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 238,
+  "Entreprise": "Almahssar",
+  "Raison sociale - Définitive": "Almahssar",
+  "nom du représentant": "Kasmi fadwa",
+  "Langue": "Fr",
+  "n de téléphone": "0661413565",
+  "email": "fkasmi@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Marrakech",
+  "Secteur": "Commerce",
+  "IS -5": 9,
+  "Statut": "SARL AU",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 41.75,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 239,
+  "Entreprise": "Autosolve AI",
+  "Raison sociale - Définitive": "Autosolve AI - AE",
+  "nom du représentant": "Lahssioui Sami",
+  "Langue": "Fr",
+  "n de téléphone": "0623587022",
+  "email": "sami.lahssioui@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Marrakech",
+  "Secteur": "Services",
+  "IS -5": 4.666666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 55,
+  "Processus": 50,
+  "Technologies": 15,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 44.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 240,
+  "Entreprise": "Boutique safae",
+  "Raison sociale - Définitive": "Boutique Safae - Sebbani - AE",
+  "nom du représentant": "الصباني صفاء",
+  "Langue": "Ar",
+  "n de téléphone": "0621185101",
+  "email": "Safae.se.7@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Marrakech",
+  "Secteur": "Commerce",
+  "IS -5": 7.666666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 10,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 34.416666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 241,
+  "Entreprise": "Clover Studio",
+  "Raison sociale - Définitive": "Clover Studio",
+  "nom du représentant": "Chioua Zakarya",
+  "Langue": "Fr",
+  "n de téléphone": "0701196123",
+  "email": "zakarya.ch@clover-studio.ma",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Marrakech",
+  "Secteur": "Services",
+  "IS -5": 8.291666666666668,
+  "Statut": "SARL",
+  "Stratégie": 83.33333333333333,
+  "Culture & RH": 100,
+  "Relation Client": 65,
+  "Processus": 50,
+  "Technologies": 50,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 64.30555555555556,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 243,
+  "Entreprise": "IMPELAB",
+  "Raison sociale - Définitive": "Impelab",
+  "nom du représentant": "abdelhadi BOUMHAOUTE",
+  "Langue": "Fr",
+  "n de téléphone": "0699501228",
+  "email": "boumhaoute.a@impelab.com",
+  "Qualité du répondant": "Responsable des opérations \/ production",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Marrakech",
+  "Secteur": "Services",
+  "IS -5": 8.916666666666668,
+  "Statut": "SARL AU",
+  "Stratégie": 35,
+  "Culture & RH": 75,
+  "Relation Client": 66,
+  "Processus": 83.33333333333333,
+  "Technologies": 80,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 58.638888888888886,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 245,
+  "Entreprise": "Learning Factory 8",
+  "Raison sociale - Définitive": "Learning Factory 8",
+  "nom du représentant": "EL AMRANI Mounia",
+  "Langue": "Fr",
+  "n de téléphone": "0624317113",
+  "email": "learningfactory8@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Marrakech",
+  "Secteur": "Education - Santé",
+  "IS -5": 6.583333333333333,
+  "Statut": "SARL AU",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 44.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 249,
+  "Entreprise": "POWER FLEET",
+  "Raison sociale - Définitive": "Power Fleet",
+  "nom du représentant": "SALMA EL HILI",
+  "Langue": "Fr",
+  "n de téléphone": "0608084040",
+  "email": "contact@powerfleet.ma",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Marrakech",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.541666666666666,
+  "Statut": "SARL AU",
+  "Stratégie": 68.33333333333333,
+  "Culture & RH": 100,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 55.5,
+  "Sécurité & Données": 43.75,
+  "Moyenne globale ": 60.513888888888886,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 252,
+  "Entreprise": "Godima group sarl",
+  "Raison sociale - Définitive": "Godima Group",
+  "nom du représentant": "Hicham El Halloumi",
+  "Langue": "Fr",
+  "n de téléphone": "0661589028",
+  "email": "Godimagroup@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "El Kelâa des Sraghna",
+  "Secteur": "Services",
+  "IS -5": 7.666666666666666,
+  "Statut": "SARL",
+  "Stratégie": 75,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 42.916666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 253,
+  "Entreprise": "Magix_solaire",
+  "Raison sociale - Définitive": "Magix Solaire",
+  "nom du représentant": "Abdel ali lamhamdi",
+  "Langue": "Fr",
+  "n de téléphone": "0611116067",
+  "email": "Abdelalilamhamdi@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "El Kelâa des Sraghna",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 5.75,
+  "Statut": "SARL AU",
+  "Stratégie": 27.5,
+  "Culture & RH": 27.5,
+  "Relation Client": 32,
+  "Processus": 35,
+  "Technologies": 30.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 25.416666666666668,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 256,
+  "Entreprise": "تعاونية الإنارة الشمسية",
+  "Raison sociale - Définitive": "Coopérative Inara Chamssya",
+  "nom du représentant": "ربيع المقري",
+  "Langue": "Ar",
+  "n de téléphone": "0673071376",
+  "email": "rrim5841@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "El Kelâa des Sraghna",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 8,
+  "Statut": "Coopérative",
+  "Stratégie": 44.166666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 42.36111111111111,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 257,
+  "Entreprise": "جود",
+  "Raison sociale - Définitive": "Coopérative Joud",
+  "nom du représentant": "شيماء سالمي",
+  "Langue": "Ar",
+  "n de téléphone": "0707088738",
+  "email": "Chaimaasalmi1996@gmail.com",
+  "Qualité du répondant": "Responsable administratif et financier",
+  "Région": "Marrakech-Safi",
+  "Provnce": "El Kelâa des Sraghna",
+  "Secteur": "Agriculture",
+  "IS -5": 5.666666666666667,
+  "Statut": "Coopérative",
+  "Stratégie": 35,
+  "Culture & RH": 52.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 15,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 37.916666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 258,
+  "Entreprise": "مطبعة سيبدى",
+  "Raison sociale - Définitive": "Sibda Impression",
+  "nom du représentant": "آسية سيبدى",
+  "Langue": "Ar",
+  "n de téléphone": "0604815008",
+  "email": "sibdaimpression@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "El Kelâa des Sraghna",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 7.333333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 51.666666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 32,
+  "Processus": 50,
+  "Technologies": 65,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 41.44444444444444,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 261,
+  "Entreprise": "EL ADIB EVENTS",
+  "Raison sociale - Définitive": "El Adib Events",
+  "nom du représentant": "El Adib Meryem",
+  "Langue": "Fr",
+  "n de téléphone": "0661437631",
+  "email": "eladibevents@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Chichaoua",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 7.958333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 75.83333333333333,
+  "Culture & RH": 27.5,
+  "Relation Client": 55,
+  "Processus": 66.66666666666667,
+  "Technologies": 25,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 41.666666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 264,
+  "Entreprise": "HIDDAN BOULANGIER ASSIF SARL AU",
+  "Raison sociale - Définitive": "Hiddan Boulangier Assif",
+  "nom du représentant": "Khadija Akoudar",
+  "Langue": "Fr",
+  "n de téléphone": "0662209380",
+  "email": "‏hiddan.boulangier23@gmail.com‏",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Chichaoua",
+  "Secteur": "Commerce",
+  "IS -5": 6.333333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 35,
+  "Culture & RH": 27.5,
+  "Relation Client": 23,
+  "Processus": 50,
+  "Technologies": 15,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 27.166666666666668,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 265,
+  "Entreprise": "Izri cos sarl au",
+  "Raison sociale - Définitive": "Izri Cos",
+  "nom du représentant": "Youssef ait sidi said",
+  "Langue": "Fr",
+  "n de téléphone": "0661624098",
+  "email": "sizricos@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Chichaoua",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.5,
+  "Statut": "SARL AU",
+  "Stratégie": 68.33333333333333,
+  "Culture & RH": 27.5,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 37.30555555555555,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 269,
+  "Entreprise": "اكو هوم",
+  "Raison sociale - Définitive": "Ecohome",
+  "nom du représentant": "حسناء الزيدي",
+  "Langue": "Ar",
+  "n de téléphone": "0617250137",
+  "email": "ecohome.cooperative@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Chichaoua",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 5.708333333333333,
+  "Statut": "Coopérative",
+  "Stratégie": 44.166666666666664,
+  "Culture & RH": 27.5,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 15.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 28.944444444444443,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 270,
+  "Entreprise": "تعاونية بيو امينة",
+  "Raison sociale - Définitive": "Coopérative Bio Amina",
+  "nom du représentant": "إيمان ازريكم",
+  "Langue": "Ar",
+  "n de téléphone": "0766794773",
+  "email": "Imanezrikem08@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Chichaoua",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 7.208333333333333,
+  "Statut": "Coopérative",
+  "Stratégie": 50,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 36.666666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 274,
+  "Entreprise": "Kech Appart",
+  "Raison sociale - Définitive": "Kech Appart",
+  "nom du représentant": "Hatim JAMAL",
+  "Langue": "Fr",
+  "n de téléphone": "0661907870",
+  "email": "jhatim@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Al Haouz",
+  "Secteur": "Services",
+  "IS -5": 7.25,
+  "Statut": "SARL",
+  "Stratégie": 35,
+  "Culture & RH": 75,
+  "Relation Client": 27.5,
+  "Processus": 50,
+  "Technologies": 50,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 45.833333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 275,
+  "Entreprise": "Le pouvoir des plantes",
+  "Raison sociale - Définitive": "Le pouvoir des plantes - Sourour - AE",
+  "nom du représentant": "Safa sourour",
+  "Langue": "Fr",
+  "n de téléphone": "0666746795",
+  "email": "lepouvoirdesplantes18@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Al Haouz",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 6.375,
+  "Statut": "Personne physique",
+  "Stratégie": 52.5,
+  "Culture & RH": 50,
+  "Relation Client": 27.5,
+  "Processus": 66.66666666666667,
+  "Technologies": 55.5,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 46.19444444444445,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 286,
+  "Entreprise": "Seraj Academy",
+  "Raison sociale - Définitive": "Seraj Academy",
+  "nom du représentant": "نائلة الكواي",
+  "Langue": "Ar",
+  "n de téléphone": "0645428441",
+  "email": "nailaelkouay6@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Rehamna",
+  "Secteur": "Education - Santé",
+  "IS -5": 5.041666666666666,
+  "Statut": "SARL",
+  "Stratégie": 68.33333333333333,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 40.138888888888886,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 287,
+  "Entreprise": "SF solution",
+  "Raison sociale - Définitive": "SF Solution",
+  "nom du représentant": " Said El farihi",
+  "Langue": "Fr",
+  "n de téléphone": "0644558794",
+  "email": "sfsolution4@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Rehamna",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 8.958333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 44.166666666666664,
+  "Culture & RH": 75,
+  "Relation Client": 90,
+  "Processus": 100,
+  "Technologies": 70,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 65.27777777777777,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 288,
+  "Entreprise": "تعاونية ابدعات الرحامنة",
+  "Raison sociale - Définitive": "Coopérative Ibdaat Rehamna",
+  "nom du représentant": "مجيدة البركاوي",
+  "Langue": "Ar",
+  "n de téléphone": "0615556490",
+  "email": "MajidaBerkaoui79@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Rehamna",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.958333333333334,
+  "Statut": "Coopérative",
+  "Stratégie": 68.33333333333333,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 65,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 49.72222222222222,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 290,
+  "Entreprise": "كرين اكري",
+  "Raison sociale - Définitive": "Coopérative Green Agri",
+  "nom du représentant": "بناني زياتني نادية",
+  "Langue": "Ar",
+  "n de téléphone": "0606248056",
+  "email": "Nadiabennani.ziat@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Rehamna",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 7.375,
+  "Statut": "Coopérative",
+  "Stratégie": 84.16666666666667,
+  "Culture & RH": 50,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 70,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 48.44444444444445,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 293,
+  "Entreprise": "تعاونية أسبد",
+  "Raison sociale - Définitive": "Coopérative Assid",
+  "nom du représentant": "حياة احزيمة",
+  "Langue": "Ar",
+  "n de téléphone": "0665829686",
+  "email": "hayathazima@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Al Haouz",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 7.375,
+  "Statut": "Coopérative",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 55,
+  "Processus": 35,
+  "Technologies": 10.5,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 37.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 296,
+  "Entreprise": "تعاونية امين تدارت",
+  "Raison sociale - Définitive": "Coopérative Amine Taddart",
+  "nom du représentant": "ابراهيم حسبي",
+  "Langue": "Ar",
+  "n de téléphone": "0700198778",
+  "email": "Hasbybrahim@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Al Haouz",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9,
+  "Statut": "Coopérative",
+  "Stratégie": 52.5,
+  "Culture & RH": 50,
+  "Relation Client": 32,
+  "Processus": 5,
+  "Technologies": 30.5,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 34.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 297,
+  "Entreprise": "تعاونية ياسمين كوير",
+  "Raison sociale - Définitive": "Coopérative Yasmine Cuir",
+  "nom du représentant": "حميد باحسو",
+  "Langue": "Ar",
+  "n de téléphone": "0663758440",
+  "email": "Yyassaminecuir@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": "Al Haouz",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.666666666666666,
+  "Statut": "Coopérative",
+  "Stratégie": 51.666666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 36.19444444444444,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 300,
+  "Entreprise": "Formaja elfarrah",
+  "Raison sociale - Définitive": "Formaja elfarrah",
+  "nom du représentant": "sihame ben youness  ",
+  "Langue": "Fr",
+  "n de téléphone": "0644039275",
+  "email": "sihamebenyouness@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": 0,
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.75,
+  "Statut": "SARL AU",
+  "Stratégie": 68.33333333333333,
+  "Culture & RH": 75,
+  "Relation Client": 27.5,
+  "Processus": 100,
+  "Technologies": 15.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 47.72222222222222,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Non spécifié",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 301,
+  "Entreprise": "تعاونية فنون خزف وسيراميك لمزوضة",
+  "Raison sociale - Définitive": "تعاونية فنون خزف وسيراميك لمزوضة",
+  "nom du représentant": "رشيد ايت جايت",
+  "Langue": "Ar",
+  "n de téléphone": "0703159922 - \n0611061046",
+  "email": "cooperative.mzouda123@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Marrakech-Safi",
+  "Provnce": 0,
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.166666666666668,
+  "Statut": "Coopérative",
+  "Stratégie": 35.833333333333336,
+  "Culture & RH": 5,
+  "Relation Client": 32,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 30.472222222222225,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Non spécifié",
+  "Feminine": "Non"
+ },
+ {
+  "*": 103,
+  "Entreprise": "Coopérative wajdiyate",
+  "Raison sociale - Définitive": "Coopérative Al Wajdyate",
+  "nom du représentant": "Latifa Mentbeh",
+  "Langue": "Fr",
+  "n de téléphone": "0667051806",
+  "email": "latifamentbeh@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.166666666666666,
+  "Statut": "Coopérative",
+  "Stratégie": 27.5,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 50,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 40.416666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 104,
+  "Entreprise": "DISTOR",
+  "Raison sociale - Définitive": "Distor",
+  "nom du représentant": "Taj khalid",
+  "Langue": "Fr",
+  "n de téléphone": "0661415013",
+  "email": "Distorste@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Agriculture",
+  "IS -5": 8.75,
+  "Statut": "SARL",
+  "Stratégie": 35,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 100,
+  "Technologies": 85,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 59.583333333333336,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 108,
+  "Entreprise": "Lazaar Mohammed",
+  "Raison sociale - Définitive": "Anava Expred - Lazaar - AE",
+  "nom du représentant": "Lazaar Mohammed",
+  "Langue": "Fr",
+  "n de téléphone": "0661467700",
+  "email": "Medlazaar@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.666666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 75,
+  "Relation Client": 55,
+  "Processus": 50,
+  "Technologies": 50,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 50.416666666666664,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 113,
+  "Entreprise": "PRESTART AGENCY",
+  "Raison sociale - Définitive": "Prestart Agency",
+  "nom du représentant": "Ouijan Ayoub",
+  "Langue": "Fr",
+  "n de téléphone": "0640286756",
+  "email": "Prestart19@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Services",
+  "IS -5": 6.958333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 66.66666666666667,
+  "Culture & RH": 50,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 39.69444444444445,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 115,
+  "Entreprise": "TABET SERVICE",
+  "Raison sociale - Définitive": "Tabet Service - AE",
+  "nom du représentant": "إسماعيل ثابت",
+  "Langue": "Ar",
+  "n de téléphone": "0602451193",
+  "email": "tabet1801@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Services",
+  "IS -5": 9.666666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 83.33333333333333,
+  "Culture & RH": 75,
+  "Relation Client": 70,
+  "Processus": 50,
+  "Technologies": 80,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 65.97222222222221,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 116,
+  "Entreprise": "غزلان عطة",
+  "Raison sociale - Définitive": "Atta - AE",
+  "nom du représentant": "غزلان عطة",
+  "Langue": "Ar",
+  "n de téléphone": "0622833858",
+  "email": "ghizlaneatta@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 7.708333333333334,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 35,
+  "Culture & RH": 100,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 25,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 49.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 118,
+  "Entreprise": "Cooperative TNIYA",
+  "Raison sociale - Définitive": "Coopérative Tnyia",
+  "nom du représentant": "Zohra Daoud",
+  "Langue": "Fr",
+  "n de téléphone": "0662431623",
+  "email": "zehra.daoud@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 6.541666666666667,
+  "Statut": "Coopérative",
+  "Stratégie": 35,
+  "Culture & RH": 27.5,
+  "Relation Client": 5,
+  "Processus": 5,
+  "Technologies": 21,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 15.583333333333334,
+  "Profil de maturité digitale ": "Débutant",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 119,
+  "Entreprise": "Decomaitre",
+  "Raison sociale - Définitive": "Decomaitre",
+  "nom du représentant": "Arraj mimoun",
+  "Langue": "Fr",
+  "n de téléphone": "0661615390",
+  "email": "deco.maitre202@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Commerce",
+  "IS -5": 3.875,
+  "Statut": "SARL AU",
+  "Stratégie": 27.5,
+  "Culture & RH": 27.5,
+  "Relation Client": 18.5,
+  "Processus": 5,
+  "Technologies": 21,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 16.583333333333332,
+  "Profil de maturité digitale ": "Débutant",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 121,
+  "Entreprise": "Groupe Scolaire Afdal Oujda",
+  "Raison sociale - Définitive": "Groupe scolaire Afdal",
+  "nom du représentant": "Groupe Scolaire Afdal Oujda",
+  "Langue": "Fr",
+  "n de téléphone": "0536520877 - \n0682417131",
+  "email": "moujahid.mostafa42@yahoo.fr",
+  "Qualité du répondant": "Responsable des opérations \/ production",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Education - Santé",
+  "IS -5": 8.5,
+  "Statut": "SARL",
+  "Stratégie": 52.5,
+  "Culture & RH": 75,
+  "Relation Client": 41,
+  "Processus": 20,
+  "Technologies": 40,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 40.166666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 125,
+  "Entreprise": "Pourellas",
+  "Raison sociale - Définitive": "Coopérative Pourellas",
+  "nom du représentant": "Ibtissam Rguyeg",
+  "Langue": "Fr",
+  "n de téléphone": "0633055536",
+  "email": "contact.pourellas@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9.166666666666666,
+  "Statut": "Coopérative",
+  "Stratégie": 35,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 36.25,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 127,
+  "Entreprise": "Sylvi-servi",
+  "Raison sociale - Définitive": "Sylvi Servi",
+  "nom du représentant": "MOHAMMED EZZIDANI",
+  "Langue": "Fr",
+  "n de téléphone": "0708012607",
+  "email": "mouhammedezzidani@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Agriculture",
+  "IS -5": 6.666666666666666,
+  "Statut": "SARL AU",
+  "Stratégie": 35,
+  "Culture & RH": 52.5,
+  "Relation Client": 9.5,
+  "Processus": 20,
+  "Technologies": 35.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 25.416666666666668,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 129,
+  "Entreprise": "Coopérative oulad Mériem",
+  "Raison sociale - Définitive": "Coopérative Oulad Meriem",
+  "nom du représentant": "SMAIL MUSTAPHA",
+  "Langue": "Fr",
+  "n de téléphone": "0662169521",
+  "email": "smailmustapha32@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9.083333333333334,
+  "Statut": "Coopérative",
+  "Stratégie": 35.833333333333336,
+  "Culture & RH": 5,
+  "Relation Client": 45.5,
+  "Processus": 68.33333333333333,
+  "Technologies": 10.5,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 31.694444444444446,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 130,
+  "Entreprise": "Oriental Gold",
+  "Raison sociale - Définitive": "Oriental Gold",
+  "nom du représentant": "Kerzazi ikram",
+  "Langue": "Fr",
+  "n de téléphone": "0605918419",
+  "email": "Coop.orientalgold@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.458333333333334,
+  "Statut": "Coopérative",
+  "Stratégie": 43.333333333333336,
+  "Culture & RH": 5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 65,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 35.55555555555556,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 131,
+  "Entreprise": "تعاونية عائشة للتنمية",
+  "Raison sociale - Définitive": "Coopérative Aicha",
+  "nom du représentant": "عائشة بوغزال",
+  "Langue": "Ar",
+  "n de téléphone": "0660800783",
+  "email": "cch297421@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Oujda-Angad",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9,
+  "Statut": "Coopérative",
+  "Stratégie": 75,
+  "Culture & RH": 75,
+  "Relation Client": 55,
+  "Processus": 50,
+  "Technologies": 85,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 60.833333333333336,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 134,
+  "Entreprise": "تعاونية إخلاص كنفودة",
+  "Raison sociale - Définitive": "Coopérative Ikhlasse Guenfouda",
+  "nom du représentant": "El Aziza Ismaili",
+  "Langue": "Fr",
+  "n de téléphone": "0766746208",
+  "email": "Cooperativikhlass@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Jerada",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.583333333333334,
+  "Statut": "Coopérative",
+  "Stratégie": 44.166666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 35.52777777777778,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 139,
+  "Entreprise": "ALUMNAD PLUS",
+  "Raison sociale - Définitive": "Alumnad Plus",
+  "nom du représentant": "محمد الهواري",
+  "Langue": "Ar",
+  "n de téléphone": "0672096140",
+  "email": "Commercial.medalumnad1@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Commerce",
+  "IS -5": 9,
+  "Statut": "SARL AU",
+  "Stratégie": 66.66666666666667,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 70,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 54.02777777777778,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 140,
+  "Entreprise": "Benhaddoufer",
+  "Raison sociale - Définitive": "Benhaddou Fer",
+  "nom du représentant": "Hajar hani",
+  "Langue": "Fr",
+  "n de téléphone": "0610380405",
+  "email": "Support@benhaddoufer.com",
+  "Qualité du répondant": "Responsable des opérations \/ production",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 5.833333333333334,
+  "Statut": "SARL",
+  "Stratégie": 35,
+  "Culture & RH": 50,
+  "Relation Client": 60,
+  "Processus": 100,
+  "Technologies": 65,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 51.666666666666664,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Entre 10 et 50 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 142,
+  "Entreprise": "BRANDT CANDY SARL",
+  "Raison sociale - Définitive": "Brandt Candy",
+  "nom du représentant": "Harouach Sanae",
+  "Langue": "Fr",
+  "n de téléphone": "0690416156",
+  "email": "Brandtcandy2021@gmail.com",
+  "Qualité du répondant": "Responsable administratif et financier",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Commerce",
+  "IS -5": 8.541666666666666,
+  "Statut": "SARL AU",
+  "Stratégie": 91.66666666666667,
+  "Culture & RH": 50,
+  "Relation Client": 32.5,
+  "Processus": 83.33333333333333,
+  "Technologies": 70.5,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 56.75,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Entre 10 et 50 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 146,
+  "Entreprise": "Institut professionnel d'optique optométrie et paramédical privé",
+  "Raison sociale - Définitive": "Institut Professionnel d'optique optométrie et paramédical privé",
+  "nom du représentant": "jamal zekhnini",
+  "Langue": "Fr",
+  "n de téléphone": "0636203606",
+  "email": "jamalzekhnini3@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Education - Santé",
+  "IS -5": 6.791666666666666,
+  "Statut": "SARL",
+  "Stratégie": 60,
+  "Culture & RH": 75,
+  "Relation Client": 55,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 52.083333333333336,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Entre 10 et 50 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 147,
+  "Entreprise": "Mustapha YAICH",
+  "Raison sociale - Définitive": "Yaich - PP",
+  "nom du représentant": "YAICH Mustapha",
+  "Langue": "Fr",
+  "n de téléphone": "0665769560",
+  "email": "mustapha.yaich.el.khamlichi@gmail.com ",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Services",
+  "IS -5": 9,
+  "Statut": "Personne physique",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 55,
+  "Processus": 50,
+  "Technologies": 55,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 47.5,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 149,
+  "Entreprise": "Print Corner",
+  "Raison sociale - Définitive": "Print Corner",
+  "nom du représentant": "Maha Boughardaien",
+  "Langue": "Fr",
+  "n de téléphone": "0691896642",
+  "email": "Mahagraphiste2023@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9,
+  "Statut": "SARL",
+  "Stratégie": 20.833333333333332,
+  "Culture & RH": 50,
+  "Relation Client": 41,
+  "Processus": 100,
+  "Technologies": 80,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 52.80555555555555,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 150,
+  "Entreprise": "Raedat Invest",
+  "Raison sociale - Définitive": "Raedat Invest",
+  "nom du représentant": "Sanaa Ouriachi",
+  "Langue": "Fr",
+  "n de téléphone": "0670426144",
+  "email": "raedat.invest@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Services",
+  "IS -5": 9.375,
+  "Statut": "SARL",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 44.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 155,
+  "Entreprise": "الأكاديمية الدولية أمجاد برو للغات و التكوين المستمر",
+  "Raison sociale - Définitive": "Amjad Pro",
+  "nom du représentant": "كريم رماش",
+  "Langue": "Ar",
+  "n de téléphone": "0601327737",
+  "email": "k.rammach@gmail.com",
+  "Qualité du répondant": "Responsable administratif et financier",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Education - Santé",
+  "IS -5": 7.583333333333334,
+  "Statut": "SARL",
+  "Stratégie": 75,
+  "Culture & RH": 27.5,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 15.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 35.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 156,
+  "Entreprise": "الحماشية",
+  "Raison sociale - Définitive": "Coopérative Alhamachya",
+  "nom du représentant": "عبد الخالق أعايد",
+  "Langue": "Ar",
+  "n de téléphone": "0660153588",
+  "email": "Hamach@live.fr",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Commerce",
+  "IS -5": 9.166666666666666,
+  "Statut": "Coopérative",
+  "Stratégie": 52.5,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 37.916666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 158,
+  "Entreprise": "WEBICH",
+  "Raison sociale - Définitive": "Webich - Echfa - AE",
+  "nom du représentant": "حمزة الشف",
+  "Langue": "Ar",
+  "n de téléphone": "0712582977",
+  "email": "hamzaichfa77@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Services",
+  "IS -5": 9.333333333333332,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 50,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 49.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 160,
+  "Entreprise": "تعاونية نحالة حاسي بركان",
+  "Raison sociale - Définitive": "Coopérative Nahhalat Hassi Berkane",
+  "nom du représentant": "حماد فكروني",
+  "Langue": "Ar",
+  "n de téléphone": "0642234290",
+  "email": "fakrouni6767@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Nador",
+  "Secteur": "Agriculture",
+  "IS -5": 5.583333333333333,
+  "Statut": "Coopérative",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 32,
+  "Processus": 35,
+  "Technologies": 20.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 32.916666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 165,
+  "Entreprise": "KSN",
+  "Raison sociale - Définitive": "KSN Travaux",
+  "nom du représentant": "KASMI NAJEM",
+  "Langue": "Fr",
+  "n de téléphone": "0673902994",
+  "email": "kasminajem3@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Berkane",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 7.416666666666667,
+  "Statut": "SARL AU",
+  "Stratégie": 44.166666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 75,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 46.52777777777777,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 169,
+  "Entreprise": "Coopérative agricole al massira",
+  "Raison sociale - Définitive": "Coopérative Al Massira",
+  "nom du représentant": "Abbas mostafa",
+  "Langue": "Fr",
+  "n de téléphone": "0667774109",
+  "email": "am.abbas.mostafa@gmail.com",
+  "Qualité du répondant": "Responsable administratif et financier",
+  "Région": "Oriental",
+  "Provnce": "Figuig",
+  "Secteur": "Commerce",
+  "IS -5": 7.458333333333334,
+  "Statut": "Coopérative",
+  "Stratégie": 27.5,
+  "Culture & RH": 5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 25.416666666666668,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 170,
+  "Entreprise": "Coopérative Moughl",
+  "Raison sociale - Définitive": "Coopérative Moughl",
+  "nom du représentant": "Laouar hayat",
+  "Langue": "Fr",
+  "n de téléphone": "0613624525",
+  "email": "cuminbeldi1@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Figuig",
+  "Secteur": "Commerce",
+  "IS -5": 8,
+  "Statut": "Coopérative",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 23,
+  "Processus": 5,
+  "Technologies": 40.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 29.75,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 172,
+  "Entreprise": "تعاونية ازطا للخياطة والطرز والنسيج",
+  "Raison sociale - Définitive": "Coopérative Azta",
+  "nom du représentant": "فضيلة شاشا",
+  "Langue": "Ar",
+  "n de téléphone": "0615471874",
+  "email": "Fadilachacha3@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Figuig",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 6.75,
+  "Statut": "Coopérative",
+  "Stratégie": 35,
+  "Culture & RH": 52.5,
+  "Relation Client": 65,
+  "Processus": 51.666666666666664,
+  "Technologies": 25,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 38.19444444444444,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 173,
+  "Entreprise": "تعاونية أزغديس",
+  "Raison sociale - Définitive": "Coopérative Azeghdis",
+  "nom du représentant": "علي فضل جمال",
+  "Langue": "Ar",
+  "n de téléphone": "0766619026",
+  "email": "jamaldefg@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Figuig",
+  "Secteur": "Agriculture",
+  "IS -5": 4.916666666666666,
+  "Statut": "Coopérative",
+  "Stratégie": 35,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 55,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 40.416666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 177,
+  "Entreprise": "افراح نجم الشرق لتنظيم و تجهيز جميع الحفلات و المناسبات",
+  "Raison sociale - Définitive": "Afrah Najm Charq - Lasshab - AE",
+  "nom du représentant": "عبد المجيد لصهب",
+  "Langue": "Ar",
+  "n de téléphone": "0677637929",
+  "email": "abdelmajidlashab@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Guercif",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 7.458333333333333,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 42.5,
+  "Culture & RH": 50,
+  "Relation Client": 46,
+  "Processus": 20,
+  "Technologies": 20,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 33.916666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 178,
+  "Entreprise": "تعاونية تغمة الفلاحية لإنتاج الزعفران الحر والجوز",
+  "Raison sociale - Définitive": "Coopérative Taghma",
+  "nom du représentant": "زليخة لبوخ",
+  "Langue": "Ar",
+  "email": "Zoulikhaiitri123@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Guercif",
+  "Secteur": "Agriculture",
+  "IS -5": 9,
+  "Statut": "Coopérative",
+  "Stratégie": 52.5,
+  "Culture & RH": 50,
+  "Relation Client": 55,
+  "Processus": 83.33333333333333,
+  "Technologies": 20,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 43.47222222222222,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 180,
+  "Entreprise": "Construction el ouannany",
+  "Raison sociale - Définitive": "El Ouannany Construction",
+  "nom du représentant": "Khalid el ouannany",
+  "Langue": "Fr",
+  "n de téléphone": "0601818873",
+  "email": "khalidelouannany1@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Taourirt",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 9.041666666666668,
+  "Statut": "SARL AU",
+  "Stratégie": 35,
+  "Culture & RH": 27.5,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 34.25,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 181,
+  "Entreprise": "Eastern steel company",
+  "Raison sociale - Définitive": "Eastern Steel Company",
+  "nom du représentant": "Zannouti hasnae",
+  "Langue": "Fr",
+  "n de téléphone": "0608490138",
+  "email": "contact@easternsteel.ma",
+  "Qualité du répondant": "Chargé(e) de la relation client",
+  "Région": "Oriental",
+  "Provnce": "Taourirt",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 9,
+  "Statut": "SARL AU",
+  "Stratégie": 100,
+  "Culture & RH": 50,
+  "Relation Client": 32,
+  "Processus": 35,
+  "Technologies": 20.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 39.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 196,
+  "Entreprise": "تعاونية بيان لاعشاب العطرية والطبية",
+  "Raison sociale - Définitive": "Coopérative Bayane",
+  "nom du représentant": "مقور مرية",
+  "Langue": "Ar",
+  "n de téléphone": "0687916321",
+  "email": "cooperativebayane@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": "Taourirt",
+  "Secteur": "Agriculture",
+  "IS -5": 9.25,
+  "Statut": "Coopérative",
+  "Stratégie": 52.5,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 50,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 46.25,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 306,
+  "Entreprise": "Kids Space Al Majd",
+  "Raison sociale - Définitive": "Kids Space Al Majd",
+  "nom du représentant": "مريم المجيدي",
+  "Langue": "Ar",
+  "n de téléphone": "0623427557",
+  "email": "Elmajidimeriem@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": 0,
+  "Secteur": "Education - Santé",
+  "IS -5": 5.75,
+  "Statut": "SARL AU",
+  "Stratégie": 60,
+  "Culture & RH": 5,
+  "Relation Client": 32,
+  "Processus": 35,
+  "Technologies": 15.5,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 26.666666666666668,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Non spécifié",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 307,
+  "Entreprise": "Artgon MEDIA",
+  "Raison sociale - Définitive": "Artgon MEDIA",
+  "nom du représentant": "Ofeir Badr",
+  "Langue": "Fr",
+  "n de téléphone": "0660942322",
+  "email": "Mosas.ma@outlook.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": 0,
+  "Secteur": "Services",
+  "IS -5": 9.083333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 59.166666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 65,
+  "Processus": 50,
+  "Technologies": 55,
+  "Sécurité & Données": 62.5,
+  "Moyenne globale ": 56.944444444444436,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Non spécifié",
+  "Feminine": "Non"
+ },
+ {
+  "*": 308,
+  "Entreprise": "Mahdi optique zekhnini Jamal",
+  "Raison sociale - Définitive": "Mahdi optique zekhnini Jamal",
+  "nom du représentant": "jamal zekhnini",
+  "Langue": "Fr",
+  "n de téléphone": "0763280327 - \n0766171337",
+  "email": "khorarifz@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Oriental",
+  "Provnce": 0,
+  "Secteur": "Commerce",
+  "IS -5": 6.875,
+  "Statut": "Personne physique",
+  "Stratégie": 60,
+  "Culture & RH": 75,
+  "Relation Client": 55,
+  "Processus": 35,
+  "Technologies": 15.5,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 42.166666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Non spécifié",
+  "Feminine": "Non"
+ },
+ {
+  "*": 310,
+  "Entreprise": "ثمار شجرة البلاد",
+  "Raison sociale - Définitive": "ثمار شجرة البلاد",
+  "nom du représentant": "ايت الحو عبد اللطيف",
+  "Langue": "Ar",
+  "n de téléphone": "0600206325",
+  "email": "agri.abdell@gmail.com",
+  "Qualité du répondant": "Responsable administratif et financier",
+  "Région": "Oriental",
+  "Provnce": 0,
+  "Secteur": "Agriculture",
+  "IS -5": 6.958333333333334,
+  "Statut": "Coopérative",
+  "Stratégie": 75.83333333333333,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 60,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 47.638888888888886,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Non spécifié",
+  "Feminine": "Non"
+ },
+ {
+  "*": 1,
+  "Entreprise": "African Expert For Coaching And Consulting",
+  "Raison sociale - Définitive": "African Expert",
+  "nom du représentant": "Taoufiq touzani",
+  "Langue": "Fr",
+  "n de téléphone": "0679839232",
+  "email": "taoufiktouzani68@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Fes",
+  "Secteur": "Services",
+  "IS -5": 6.708333333333333,
+  "Statut": "SARL",
+  "Stratégie": 91.66666666666667,
+  "Culture & RH": 50,
+  "Relation Client": 50.5,
+  "Processus": 50,
+  "Technologies": 80,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 59.94444444444445,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 2,
+  "Entreprise": "AYMD",
+  "Raison sociale - Définitive": "AYMD",
+  "nom du représentant": "ayou zakaria",
+  "Langue": "Fr",
+  "n de téléphone": "0644334136",
+  "email": "zakaria.ayouu@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Fes",
+  "Secteur": "Services",
+  "IS -5": 9,
+  "Statut": "SARL AU",
+  "Stratégie": 60,
+  "Culture & RH": 75,
+  "Relation Client": 65,
+  "Processus": 50,
+  "Technologies": 50,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 56.25,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 4,
+  "Entreprise": "Cfraft fashion",
+  "Raison sociale - Définitive": "Craft Fashion - AE",
+  "nom du représentant": "طارق دوكيلي",
+  "Langue": "Ar",
+  "n de téléphone": "0674508835",
+  "email": "Dawguily@outlook.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Fes",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.625,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 35,
+  "Culture & RH": 27.5,
+  "Relation Client": 65,
+  "Processus": 100,
+  "Technologies": 80,
+  "Sécurité & Données": 87.5,
+  "Moyenne globale ": 65.83333333333333,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 5,
+  "Entreprise": "DXS sarl",
+  "Raison sociale - Définitive": "DXS",
+  "nom du représentant": "chafi mohammed",
+  "Langue": "Fr",
+  "n de téléphone": "0668864786",
+  "email": "chafimohammed@gmail.com",
+  "Qualité du répondant": "Responsable administratif et financier",
+  "Région": "Fès-Meknès",
+  "Provnce": "Fes",
+  "Secteur": "Services",
+  "IS -5": 8.208333333333332,
+  "Statut": "SARL",
+  "Stratégie": 83.33333333333333,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 75,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 51.80555555555555,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 7,
+  "Entreprise": "Faical EL MZOURI",
+  "Raison sociale - Définitive": "El Mzouri - AE",
+  "nom du représentant": "فيصل المزوري",
+  "Langue": "Ar",
+  "n de téléphone": "0664660121",
+  "email": "faicalelmzouri@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Fes",
+  "Secteur": "Agriculture",
+  "IS -5": 7.083333333333333,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 15,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 33.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 11,
+  "Entreprise": "HT Conseil",
+  "Raison sociale - Définitive": "HT Conseil",
+  "nom du représentant": "Hajar Tahri",
+  "Langue": "Fr",
+  "n de téléphone": "0611951071",
+  "email": "Hajar.ing@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Fes",
+  "Secteur": "Services",
+  "IS -5": 6,
+  "Statut": "SARL",
+  "Stratégie": 27.5,
+  "Culture & RH": 5,
+  "Relation Client": 37,
+  "Processus": 50,
+  "Technologies": 15,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 24.5,
+  "Profil de maturité digitale ": "Débutant",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 13,
+  "Entreprise": "M2S SOLUTIONS",
+  "Raison sociale - Définitive": "M2S Solutions",
+  "nom du représentant": "El Amjad Salim",
+  "Langue": "Fr",
+  "n de téléphone": "0668208585",
+  "email": "Salimelamjad@m2safrica.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Fes",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 7.125,
+  "Statut": "SARL",
+  "Stratégie": 27.5,
+  "Culture & RH": 50,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 41.75,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 17,
+  "Entreprise": "The English Academy",
+  "Raison sociale - Définitive": "The English Academy",
+  "nom du représentant": "Youssef bouallag",
+  "Langue": "Fr",
+  "n de téléphone": "0663883668",
+  "email": "Youssef.bouallag@gmail.com \nTheenglishacademyfez@gmail.com\nDirector@theenglishacademy.ma",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Fes",
+  "Secteur": "Education - Santé",
+  "IS -5": 9.166666666666666,
+  "Statut": "SARL AU",
+  "Stratégie": 52.5,
+  "Culture & RH": 75,
+  "Relation Client": 50,
+  "Processus": 66.66666666666667,
+  "Technologies": 55,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 49.861111111111114,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 21,
+  "Entreprise": "MONO CASH",
+  "Raison sociale - Définitive": "Mono Cash",
+  "nom du représentant": "المهدي المهتدي",
+  "Langue": "Ar",
+  "n de téléphone": "0663149262",
+  "email": "mah12di@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Moulay Yacoub",
+  "Secteur": "Services",
+  "IS -5": 8.208333333333332,
+  "Statut": "SARL AU",
+  "Stratégie": 52.5,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 39.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 22,
+  "Entreprise": "Société atlantique design et innovation",
+  "Raison sociale - Définitive": "Atlantique Design et Innovation",
+  "nom du représentant": "Omar el abidi alaoui",
+  "Langue": "Fr",
+  "n de téléphone": "0661982075",
+  "email": "Omarelalaouiguigou@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Moulay Yacoub",
+  "Secteur": "Commerce",
+  "IS -5": 8.75,
+  "Statut": "SARL AU",
+  "Stratégie": 5,
+  "Culture & RH": 27.5,
+  "Relation Client": 36.5,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 28.583333333333332,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 27,
+  "Entreprise": "Leader space sarl",
+  "Raison sociale - Définitive": "Leader Space",
+  "nom du représentant": "Essaih hiba",
+  "Langue": "Fr",
+  "n de téléphone": "0626127015",
+  "email": "Essaihh67@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taza",
+  "Secteur": "Services",
+  "IS -5": 9.041666666666668,
+  "Statut": "SARL",
+  "Stratégie": 75,
+  "Culture & RH": 52.5,
+  "Relation Client": 55,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 44.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 28,
+  "Entreprise": "Mbida agri",
+  "Raison sociale - Définitive": "Mbida Agri - AE",
+  "nom du représentant": "عمر امبيضة",
+  "Langue": "Ar",
+  "n de téléphone": "0616288484",
+  "email": "Omarmbida2000@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taza",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 9.166666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 75,
+  "Relation Client": 41,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 50.583333333333336,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 29,
+  "Entreprise": "Rahali Academy",
+  "Raison sociale - Définitive": "Alpha Rahali",
+  "nom du représentant": "الرحالي عبد المنعم",
+  "Langue": "Ar",
+  "n de téléphone": "0601167361",
+  "email": "monimerr7@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taza",
+  "Secteur": "Education - Santé",
+  "IS -5": 8.083333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 41,
+  "Processus": 50,
+  "Technologies": 30,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 44.75,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 31,
+  "Entreprise": "RN digital",
+  "Raison sociale - Définitive": "Khadamat Agency - Rahhali - AE",
+  "nom du représentant": "Nabil RAHALI",
+  "Langue": "Fr",
+  "n de téléphone": "0700625888",
+  "email": "Khaadamatdigital@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taza",
+  "Secteur": "Services",
+  "IS -5": 9.166666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 58.333333333333336,
+  "Culture & RH": 50,
+  "Relation Client": 55,
+  "Processus": 50,
+  "Technologies": 65,
+  "Sécurité & Données": 62.5,
+  "Moyenne globale ": 56.805555555555564,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 34,
+  "Entreprise": "تعاونية شيكر",
+  "Raison sociale - Définitive": "Coopérative Chiker",
+  "nom du représentant": "نبيل تشيشة",
+  "Langue": "Ar",
+  "n de téléphone": "0665920853",
+  "email": "tazinabil92@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taza",
+  "Secteur": "Education - Santé",
+  "IS -5": 6.666666666666666,
+  "Statut": "Coopérative",
+  "Stratégie": 27.5,
+  "Culture & RH": 50,
+  "Relation Client": 41,
+  "Processus": 50,
+  "Technologies": 25,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 32.25,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 40,
+  "Entreprise": "مركز لخدمات القرب",
+  "Raison sociale - Définitive": "MH Print - Hajjoub - AE",
+  "nom du représentant": "حجوب محمد",
+  "Langue": "Ar",
+  "n de téléphone": "0642886079",
+  "email": "mohamedhajjoub4@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taza",
+  "Secteur": "Services",
+  "IS -5": 9.208333333333334,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 12.5,
+  "Culture & RH": 50,
+  "Relation Client": 36.5,
+  "Processus": 68.33333333333333,
+  "Technologies": 25.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 32.138888888888886,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 41,
+  "Entreprise": "مطبعة العلاوي",
+  "Raison sociale - Définitive": "El Allaoui - AE",
+  "nom du représentant": "كوثر العلاوي",
+  "Langue": "Ar",
+  "n de téléphone": "0669818575",
+  "email": "elalaouikaoutar66@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taza",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9.166666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 46,
+  "Processus": 50,
+  "Technologies": 80,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 49.75,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 46,
+  "Entreprise": "Coopérative DITAL MISSOUR",
+  "Raison sociale - Définitive": "Coopérative Digital Missour",
+  "nom du représentant": "Mounia EL-GHAZOUI",
+  "Langue": "Fr",
+  "n de téléphone": "0676970213",
+  "email": "elghazmouni@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Boulemane",
+  "Secteur": "Education - Santé",
+  "IS -5": 4.708333333333333,
+  "Statut": "Coopérative",
+  "Stratégie": 60,
+  "Culture & RH": 75,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 52.083333333333336,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 49,
+  "Entreprise": "تعاونية حفلات الأمراء",
+  "Raison sociale - Définitive": "Coopérative Hafalat Alomarae",
+  "nom du représentant": "لحسن لخديمي",
+  "Langue": "Ar",
+  "n de téléphone": "0697693683",
+  "email": "lakhdimi199695@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Boulemane",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 6.333333333333333,
+  "Statut": "Coopérative",
+  "Stratégie": 58.333333333333336,
+  "Culture & RH": 50,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 40.63888888888889,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 53,
+  "Entreprise": "Sefrou green parc",
+  "Raison sociale - Définitive": "Green Parc",
+  "nom du représentant": "Boumane moncif",
+  "Langue": "Fr",
+  "n de téléphone": "0676900704",
+  "email": "monsifm579@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Sefrou",
+  "Secteur": "BTP - Environnement",
+  "IS -5": 9.291666666666668,
+  "Statut": "SARL",
+  "Stratégie": 58.333333333333336,
+  "Culture & RH": 50,
+  "Relation Client": 45.5,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 43.555555555555564,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 54,
+  "Entreprise": "Ste OLIA MAROC",
+  "Raison sociale - Définitive": "Olia Maroc",
+  "nom du représentant": "Taibi Ahmed",
+  "Langue": "Fr",
+  "n de téléphone": "0661911000",
+  "email": "oliamaroc.8011@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Sefrou",
+  "Secteur": "Services",
+  "IS -5": 8.083333333333334,
+  "Statut": "SARL AU",
+  "Stratégie": 5,
+  "Culture & RH": 50,
+  "Relation Client": 5,
+  "Processus": 5,
+  "Technologies": 31,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 16,
+  "Profil de maturité digitale ": "Débutant",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 58,
+  "Entreprise": "agrichallenge sarl",
+  "Raison sociale - Définitive": "Agri Challenge",
+  "nom du représentant": "Farida Outach",
+  "Langue": "Fr",
+  "n de téléphone": "0602129007",
+  "email": "kamiltyaromes@gmail.com",
+  "Qualité du répondant": "Responsable commercial \/ marketing",
+  "Région": "Fès-Meknès",
+  "Provnce": "Ifrane",
+  "Secteur": "Services",
+  "IS -5": 9.125,
+  "Statut": "SARL",
+  "Stratégie": 51.666666666666664,
+  "Culture & RH": 50,
+  "Relation Client": 32,
+  "Processus": 50,
+  "Technologies": 20.5,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 36.11111111111111,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 62,
+  "Entreprise": "Medipics",
+  "Raison sociale - Définitive": "Medipics - Stiti - AE",
+  "nom du représentant": "Mehdi stiti",
+  "Langue": "Fr",
+  "n de téléphone": "0670754582",
+  "email": "mehdistiti@hotmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Ifrane",
+  "Secteur": "Services",
+  "IS -5": 8.208333333333334,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 35,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 43.333333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 66,
+  "Entreprise": "إدريسي البوزيدي منال",
+  "Raison sociale - Définitive": "Idrissi Bouzidi - AE",
+  "nom du représentant": "إدريسي البوزيدي منال",
+  "Langue": "Ar",
+  "n de téléphone": "0669028200",
+  "email": "manaleldrissi1@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taounate",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.333333333333334,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 66.66666666666667,
+  "Technologies": 40,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 40.69444444444445,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 68,
+  "Entreprise": "إنتاج وتسمين الحلزون",
+  "Raison sociale - Définitive": "Mezhar - AE",
+  "nom du représentant": "مزهار محمد",
+  "Langue": "Ar",
+  "n de téléphone": "0660934392",
+  "email": "Ilyasse.mezhar2019@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taounate",
+  "Secteur": "Agriculture",
+  "IS -5": 8.625,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 51.666666666666664,
+  "Culture & RH": 5,
+  "Relation Client": 5,
+  "Processus": 5,
+  "Technologies": 6,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 12.111111111111109,
+  "Profil de maturité digitale ": "Débutant",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 71,
+  "Entreprise": "تعاونية احجاوة أولاد عيسى",
+  "Raison sociale - Définitive": "Coopérative Hjawa Ouled Aissa",
+  "nom du représentant": "سجاع عثمان",
+  "Langue": "Ar",
+  "n de téléphone": "0661564124",
+  "email": "Otmansoujaa190@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taounate",
+  "Secteur": "Agriculture",
+  "IS -5": 7.083333333333333,
+  "Statut": "Coopérative",
+  "Stratégie": 35.833333333333336,
+  "Culture & RH": 27.5,
+  "Relation Client": 36.5,
+  "Processus": 20,
+  "Technologies": 55,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 31.222222222222225,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 73,
+  "Entreprise": "تعاونية هبة بيو",
+  "Raison sociale - Définitive": "Coopérative Hiba Bio",
+  "nom du représentant": "لحسن الغيدوني",
+  "Langue": "Ar",
+  "n de téléphone": "0707153700",
+  "email": "elghaidouni@gmail.com",
+  "Qualité du répondant": "Responsable commercial \/ marketing",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taounate",
+  "Secteur": "Commerce",
+  "IS -5": 8.583333333333332,
+  "Statut": "Coopérative",
+  "Stratégie": 60,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 38.333333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 77,
+  "Entreprise": "صنع وبيع الطوبية واعمدة السياج",
+  "Raison sociale - Définitive": "Bouhaja - AE",
+  "nom du représentant": "محمد بوحاجة",
+  "Langue": "Ar",
+  "n de téléphone": "0673710435",
+  "email": "M.bouhaja@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taounate",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 6.375,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 27.5,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 36.25,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 10 et 50 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 79,
+  "Entreprise": "وحدة صنع البطاطس الموجهة للقلي",
+  "Raison sociale - Définitive": "Chef Freet",
+  "nom du représentant": "ابتسام كيحل",
+  "Langue": "Ar",
+  "n de téléphone": "0677090258",
+  "email": "kbibech80@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Taounate",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.541666666666666,
+  "Statut": "SARL AU",
+  "Stratégie": 51.666666666666664,
+  "Culture & RH": 27.5,
+  "Relation Client": 41,
+  "Processus": 50,
+  "Technologies": 60,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 38.36111111111111,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 81,
+  "Entreprise": "AMZKA SARL",
+  "Raison sociale - Définitive": "Amzka",
+  "nom du représentant": "AMZEKA HASSAN",
+  "Langue": "Fr",
+  "n de téléphone": "0671883503",
+  "email": "amzka2021@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Meknes",
+  "Secteur": "Services",
+  "IS -5": 9.25,
+  "Statut": "SARL",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 66.66666666666667,
+  "Technologies": 60,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 50.27777777777778,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 84,
+  "Entreprise": "BUSINESS HOUSE ACADEMY",
+  "Raison sociale - Définitive": "Business House Academy",
+  "nom du représentant": "BENELRHAZI AZIZ",
+  "Langue": "Fr",
+  "n de téléphone": "0641656081",
+  "email": "azizceo@bha.ma",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Meknes",
+  "Secteur": "Services",
+  "IS -5": 9.041666666666666,
+  "Statut": "SARL",
+  "Stratégie": 67.5,
+  "Culture & RH": 75,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 55,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 55.833333333333336,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 85,
+  "Entreprise": "Coopérative Al khair",
+  "Raison sociale - Définitive": "Coopérative Al Khair",
+  "nom du représentant": "zaida fatima",
+  "Langue": "Fr",
+  "n de téléphone": "0662083703",
+  "email": "assocmipos@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Meknes",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.333333333333332,
+  "Statut": "Coopérative",
+  "Stratégie": 51.666666666666664,
+  "Culture & RH": 27.5,
+  "Relation Client": 27.5,
+  "Processus": 50,
+  "Technologies": 10.5,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 29.944444444444443,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 86,
+  "Entreprise": "Disna",
+  "Raison sociale - Définitive": "Disna - Naji - AE",
+  "nom du représentant": "Naji abdessamad",
+  "Langue": "Fr",
+  "n de téléphone": "0665077775",
+  "email": "abdessamad.naaji@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Meknes",
+  "Secteur": "Commerce",
+  "IS -5": 9.5,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 25,
+  "Sécurité & Données": 25,
+  "Moyenne globale ": 39.583333333333336,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 91,
+  "Entreprise": "التعاونيه كاوز فليكس",
+  "Raison sociale - Définitive": "Coopérative Gaouzflix",
+  "nom du représentant": "حسناوي عبدالزهيد",
+  "Langue": "Ar",
+  "n de téléphone": "0664605104",
+  "email": "cooperativegawzflex@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Meknes",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 8.375,
+  "Statut": "Coopérative",
+  "Stratégie": 52.5,
+  "Culture & RH": 50,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 40,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 40.416666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Entre 3 et 10 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 93,
+  "Entreprise": "Azadbel",
+  "Raison sociale - Définitive": "Azadbel",
+  "nom du représentant": "Soufiane BELBSIR",
+  "Langue": "Fr",
+  "n de téléphone": "0622587639",
+  "email": "Biomeknes@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "Meknes",
+  "Secteur": "Restauration - Tourisme",
+  "IS -5": 8.666666666666668,
+  "Statut": "SARL",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 27.5,
+  "Processus": 50,
+  "Technologies": 25,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 37.916666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 96,
+  "Entreprise": "Ait messaoud",
+  "Raison sociale - Définitive": "Ait Messaoud - PP",
+  "nom du représentant": "Abdellah ait messaoud",
+  "Langue": "Fr",
+  "n de téléphone": "0666986919",
+  "email": "Aitmessaoud11@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "El Hajeb",
+  "Secteur": "Commerce",
+  "IS -5": 6.875,
+  "Statut": "Personne physique",
+  "Stratégie": 66.66666666666667,
+  "Culture & RH": 5,
+  "Relation Client": 50,
+  "Processus": 50,
+  "Technologies": 20,
+  "Sécurité & Données": 37.5,
+  "Moyenne globale ": 38.19444444444445,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 99,
+  "Entreprise": "LAMSSAT FAYZA",
+  "Raison sociale - Définitive": "Lamssat Fayza",
+  "nom du représentant": "فايزة الكور",
+  "Langue": "Ar",
+  "n de téléphone": "0606320609",
+  "email": "fayza.elgour@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "El Hajeb",
+  "Secteur": "Services",
+  "IS -5": 8.958333333333332,
+  "Statut": "SARL AU",
+  "Stratégie": 83.33333333333333,
+  "Culture & RH": 50,
+  "Relation Client": 32,
+  "Processus": 50,
+  "Technologies": 25,
+  "Sécurité & Données": 12.5,
+  "Moyenne globale ": 42.138888888888886,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Oui"
+ },
+ {
+  "*": 100,
+  "Entreprise": "Mk confection",
+  "Raison sociale - Définitive": "MK Confection",
+  "nom du représentant": "Taoufiq touzani",
+  "Langue": "Fr",
+  "n de téléphone": "0679839232",
+  "email": "taoufiktouzani68@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Provnce": "El Hajeb",
+  "Secteur": "Industrie - Logistique",
+  "IS -5": 9.333333333333332,
+  "Statut": "SARL",
+  "Stratégie": 43.333333333333336,
+  "Culture & RH": 50,
+  "Relation Client": 27.5,
+  "Processus": 50,
+  "Technologies": 30.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 33.55555555555556,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Moins de 3 MDhs",
+  "Feminine": "Non"
+ },
+ {
+  "*": 302,
+  "Entreprise": "مؤسسة الأشراف للتعليم المدرسي الخصوصي",
+  "Raison sociale - Définitive": "مؤسسة الأشراف للتعليم المدرسي الخصوصي",
+  "nom du représentant": "فيصل ديدي",
+  "Langue": "Ar",
+  "n de téléphone": "0662101839",
+  "email": "faycelhb@gmail.com",
+  "Qualité du répondant": "Responsable administratif et financier",
+  "Région": "Fès-Meknès",
+  "Secteur": "Education - Santé",
+  "IS -5": 9.25,
+  "Statut": "Personne physique",
+  "Stratégie": 50,
+  "Culture & RH": 27.5,
+  "Relation Client": 55,
+  "Processus": 66.66666666666667,
+  "Technologies": 80,
+  "Sécurité & Données": 50,
+  "Moyenne globale ": 54.861111111111114,
+  "Profil de maturité digitale ": "Challenger",
+  "Chiffre d'affaires ": "Non spécifié",
+  "Feminine": "Non"
+ },
+ {
+  "*": 304,
+  "Entreprise": "إصلاح الهواتف وبيع اكسيسوارته - جمال الزكاري",
+  "Raison sociale - Définitive": "إصلاح الهواتف وبيع اكسيسوارته - جمال الزكاري",
+  "nom du représentant": "جمال الزكاري",
+  "Langue": "Ar",
+  "n de téléphone": "0655179554",
+  "email": "Jamalzouggari90@gmail.com",
+  "Qualité du répondant": "Dirigeant(e) - Gérant(e)",
+  "Région": "Fès-Meknès",
+  "Secteur": "Services",
+  "IS -5": 6.791666666666666,
+  "Statut": "Auto-entrepreneur",
+  "Stratégie": 60,
+  "Culture & RH": 27.5,
+  "Relation Client": 36.5,
+  "Processus": 35,
+  "Technologies": 35.5,
+  "Sécurité & Données": 0,
+  "Moyenne globale ": 32.416666666666664,
+  "Profil de maturité digitale ": "Émergent",
+  "Chiffre d'affaires ": "Non spécifié",
+  "Feminine": "Non"
+ },
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 51.666666666666664
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 36.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 10.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 25
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 84.16666666666667
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 32
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 66.66666666666667
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 56.25
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 75
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 55
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 55
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 75
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 100
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 45.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 36.666666666666664
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 40
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 60
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 23.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 5
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 15.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 5
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 36.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 15.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 60
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 15
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 67.5
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 75
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 40
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 52.5
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 75
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 100
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 70
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 51.666666666666664
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 32
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 35.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 25
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 58.333333333333336
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 36.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 12.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 60
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 45.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 25
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 60
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 55
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 15
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 60
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 36.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 10
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 83.33333333333333
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 100
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 65
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 50
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 35
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 75
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 66
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 83.33333333333333
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 80
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 12.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 60
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 68.33333333333333
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 100
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 45.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 55.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 43.75
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 75
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 12.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 32
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 35
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 30.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 44.166666666666664
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 35
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 25
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 35
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 52.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 15
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 25
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 51.666666666666664
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 32
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 65
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 75.83333333333333
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 55
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 66.66666666666667
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 25
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 35
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 23
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 15
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 12.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 68.33333333333333
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 45.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 12.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 44.166666666666664
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 36.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 15.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 50
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 35
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 75
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 50
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 52.5
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 66.66666666666667
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 55.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 25
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 68.33333333333333
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 25
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 44.166666666666664
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 75
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 90
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 100
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 70
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 12.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 68.33333333333333
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 50
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 65
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 84.16666666666667
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 36.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 70
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 60
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 55
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 35
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 10.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 52.5
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 32
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 5
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 30.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 37.5
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 51.666666666666664
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 50
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 45.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 20
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 68.33333333333333
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 75
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 27.5
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 100
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 15.5
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 0
+ },
+ null,
+ null,
+ null,
+ null,
+ {
+  "Column27": "Stratégie",
+  "Column28": 35.833333333333336
+ },
+ {
+  "Column27": "Culture & RH",
+  "Column28": 5
+ },
+ {
+  "Column27": "Relation Client",
+  "Column28": 32
+ },
+ {
+  "Column27": "Processus",
+  "Column28": 50
+ },
+ {
+  "Column27": "Technologies",
+  "Column28": 35
+ },
+ {
+  "Column27": "Sécurité & Données",
+  "Column28": 25
+ }
+];
+        // --- END: COLLER VOS DONNÉES JSON ICI ---
+
+        const companiesData = rawData.filter(item => item && typeof item === 'object' && item.hasOwnProperty('Entreprise') && item.Entreprise !== null);
+
+        const companyListElement = document.getElementById('companyList');
+        const companyDetailsElement = document.getElementById('companyDetails');
+        const searchCompanyInput = document.getElementById('searchCompany');
+        let radarChartInstance = null;
+        let selectedCompanyIndex = -1; 
+
+        const filterRegionElement = document.getElementById('filterRegion');
+        const filterSecteurElement = document.getElementById('filterSecteur');
+        const filterProfilElement = document.getElementById('filterProfil');
+        const filterStatutElement = document.getElementById('filterStatut');
+        const filterCAElement = document.getElementById('filterCA');
+        const filterLangueElement = document.getElementById('filterLangue');
+
+        const downloadSheetButton = document.getElementById('downloadSheetButton');
+        const companyCountElement = document.getElementById('companyCount');
+        const resetFiltersButton = document.getElementById('resetFiltersButton');
+        const companyDetailTitleElement = document.getElementById('companyDetailTitle');
+
+        const totalCompaniesStatElement = document.getElementById('totalCompaniesStat');
+        const displayedCompaniesStatElement = document.getElementById('displayedCompaniesStat');
+        const majorProfileStatElement = document.getElementById('majorProfileStat');
+        const majorSectorStatElement = document.getElementById('majorSectorStat');
+
+        const svgIcons = {
+            user: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>',
+            briefcase: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H2V6zM2 12v2a2 2 0 002 2h12a2 2 0 002-2v-2H2z" clip-rule="evenodd" /></svg>',
+            globe: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.002 6.002 0 019.336 0l.208.29A8.001 8.001 0 004.54 8.318l-.208-.29zm11.336 3.946a6.002 6.002 0 01-9.336 0l-.208-.29A8.001 8.001 0 0015.46 11.682l.208.29z" clip-rule="evenodd" /></svg>',
+            tag: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5a.997.997 0 01.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>',
+            chartBar: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>',
+            currencyDollar: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.5 2.5 0 00-.567-.267C8.07 8.488 8 8.737 8 9.01V11c0 .273.07.522.233.698.155.103.346.196.567.267v1.698a2.5 2.5 0 00.567.267c.22.07.412.163.567.267.163.103.29.24.383.408.094.168.15.368.15.59V17a1 1 0 001 1h1a1 1 0 001-1v-.01a4.505 4.505 0 00-.15-.59c-.093-.168-.22-.305-.383-.408a2.501 2.501 0 00-.567-.267V13.42a2.5 2.5 0 00.567.267c.163.103.328.217.47.35.137.128.25.282.327.452.08.17.12.364.12.573V17a1 1 0 001 1h1a1 1 0 001-1v-2.19c0-.203-.056-.4-.15-.562a2.004 2.004 0 00-.383-.395c-.163-.103-.354-.196-.567-.267V9.81a2.5 2.5 0 00.567-.267c.22-.07.412-.163.567.267.163-.103.29.24.383.408.094-.168.15.368.15-.59V6a1 1 0 00-1-1h-1a1 1 0 00-1 1v.01a4.505 4.505 0 00.15.59c.093.168.22.305.383.408a2.501 2.501 0 00.567.267V8.58a2.5 2.5 0 00-.567-.267c-.163-.103-.328-.217-.47-.35a1.99 1.99 0 00-.327-.452C11.95 7.364 11.91 7.17 11.91 6.96V5a1 1 0 00-1-1h-1a1 1 0 00-1 1v2.19c0 .203.056.4.15.562a2.004 2.004 0 00.383.395z" /></svg>',
+            phone: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" /></svg>',
+            mail: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>',
+            academicCap : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.998.998 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.01 9.383L10 12.528l6.99-3.145A.999.999 0 0117.545 9V6.44a1 1 0 00-1.095-.986l-1.44-.411a1 1 0 00-.86.495L10 8.118l-4.15-1.594a1 1 0 00-.858-.495l-1.44.411A1 1 0 002.455 6.44V9a.999.999 0 01.555.883zM10 18a7 7 0 100-14 7 7 0 000 14z" /></svg>',
+            identification: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 00-1 1v1a1 1 0 002 0V3a1 1 0 00-1-1zM4 4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1H4zm10 2a1 1 0 100-2H6a1 1 0 100 2h8z" clip-rule="evenodd" /></svg>',
+            language: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7 2a1 1 0 00-.707 1.707L7.586 5H4a1 1 0 000 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414l-3-3A1 1 0 007 2zm9 4a1 1 0 011-1h3a1 1 0 110 2h-3a1 1 0 01-1-1zm-1 4a1 1 0 011-1h3a1 1 0 110 2h-3a1 1 0 01-1-1zm-1 4a1 1 0 011-1h3a1 1 0 110 2h-3a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>',
+            femaleUser: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-pink-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>', // Placeholder, replace with actual female icon if needed
+        };
+
+        function populateFilters() {
+            const regions = new Set();
+            const secteurs = new Set();
+            const profils = new Set();
+            const statuts = new Set();
+            const cas = new Set();
+            const langues = new Set();
+
+            companiesData.forEach(company => {
+                if (company["Région"] && company["Région"].toString().trim() !== "0") regions.add(company["Région"].toString().trim());
+                if (company["Secteur"]) secteurs.add(company["Secteur"]);
+                if (company["Profil de maturité digitale "]) profils.add(company["Profil de maturité digitale "]);
+                if (company["Statut"]) statuts.add(company["Statut"]);
+                if (company["Chiffre d'affaires "]) cas.add(company["Chiffre d'affaires "]);
+                if (company["Langue"]) langues.add(company["Langue"]);
+            });
+            
+            const populateSelect = (element, items) => {
+                // Clear existing options except the first one ("Tous/Toutes")
+                while (element.options.length > 1) {
+                    element.remove(1);
+                }
+                Array.from(items).sort((a,b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'})).forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item;
+                    option.textContent = item;
+                    element.appendChild(option);
+                });
+            };
+
+            populateSelect(filterRegionElement, regions);
+            populateSelect(filterSecteurElement, secteurs);
+            populateSelect(filterProfilElement, profils);
+            populateSelect(filterStatutElement, statuts);
+            populateSelect(filterCAElement, cas);
+            populateSelect(filterLangueElement, langues);
+        }
+        
+        function updateGlobalStats(displayedCompanies) {
+            totalCompaniesStatElement.textContent = companiesData.length;
+            displayedCompaniesStatElement.textContent = displayedCompanies.length;
+
+            if (displayedCompanies.length > 0) {
+                const countItems = (key) => displayedCompanies.reduce((acc, company) => {
+                    const item = company[key] || "N/A";
+                    acc[item] = (acc[item] || 0) + 1;
+                    return acc;
+                }, {});
+                
+                const getMajorItem = (counts) => Object.keys(counts).length > 0 ? Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b) : "-";
+
+                const profileCounts = countItems("Profil de maturité digitale ");
+                majorProfileStatElement.textContent = getMajorItem(profileCounts);
+
+                const sectorCounts = countItems("Secteur");
+                majorSectorStatElement.textContent = getMajorItem(sectorCounts);
+
+            } else {
+                majorProfileStatElement.textContent = "-";
+                majorSectorStatElement.textContent = "-";
+            }
+        }
+
+        function filterAndDisplayCompanies() {
+            const searchTerm = searchCompanyInput.value.toLowerCase();
+            const selectedRegion = filterRegionElement.value;
+            const selectedSecteur = filterSecteurElement.value;
+            const selectedProfil = filterProfilElement.value;
+            const selectedStatut = filterStatutElement.value;
+            const selectedCA = filterCAElement.value;
+            const selectedLangue = filterLangueElement.value;
+
+            const filteredCompanies = companiesData.filter(company => {
+                const nameMatch = (company["Raison sociale - Définitive"] || company["Entreprise"]).toLowerCase().includes(searchTerm);
+                const regionMatch = selectedRegion ? company["Région"] === selectedRegion : true;
+                const secteurMatch = selectedSecteur ? company["Secteur"] === selectedSecteur : true;
+                const profilMatch = selectedProfil ? company["Profil de maturité digitale "] === selectedProfil : true;
+                const statutMatch = selectedStatut ? company["Statut"] === selectedStatut : true;
+                const caMatch = selectedCA ? company["Chiffre d'affaires "] === selectedCA : true;
+                const langueMatch = selectedLangue ? company["Langue"] === selectedLangue : true;
+                return nameMatch && regionMatch && secteurMatch && profilMatch && statutMatch && caMatch && langueMatch;
+            });
+            displayCompanies(filteredCompanies);
+            updateGlobalStats(filteredCompanies);
+        }
+
+        function displayCompanies(companiesToDisplay) {
+            companyListElement.innerHTML = ''; 
+            companyCountElement.textContent = `${companiesToDisplay.length} affichée(s)`;
+            
+            if (companiesToDisplay.length === 0) {
+                companyListElement.innerHTML = '<li class="text-gray-500 p-3 text-center">Aucune entreprise ne correspond à vos critères.</li>';
+                return;
+            }
+            companiesToDisplay.forEach(company => {
+                const originalIndex = companiesData.findIndex(c => c["*"] === company["*"]);
+                const listItem = document.createElement('li');
+                
+                let feminineBadge = '';
+                if (company["Feminine"] === "Oui") {
+                    feminineBadge = '<span class="ml-2 px-1.5 py-0.5 text-xs font-semibold text-pink-700 bg-pink-100 rounded-full">Fém.</span>';
+                }
+
+                listItem.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-medium text-indigo-700 group-hover:text-indigo-800">${company["Raison sociale - Définitive"] || company["Entreprise"]}</span>
+                        ${feminineBadge}
+                    </div>
+                    <span class="block text-xs text-gray-500 group-hover:text-gray-600">${company["Secteur"] || 'N/A'} - ${company["Région"] || 'N/A'}</span>
+                `;
+                listItem.className = 'p-3 bg-gray-50 hover:bg-indigo-50 cursor-pointer rounded-lg company-card text-gray-800 text-sm group';
+                listItem.setAttribute('data-id', company["*"]); 
+
+                if (originalIndex === selectedCompanyIndex) {
+                    listItem.classList.add('selected');
+                }
+
+                listItem.addEventListener('click', () => {
+                    selectedCompanyIndex = originalIndex;
+                    displayCompanyDetails(originalIndex);
+                    document.querySelectorAll('#companyList li').forEach(li => li.classList.remove('selected'));
+                    listItem.classList.add('selected');
+                    downloadSheetButton.disabled = false; 
+                });
+                companyListElement.appendChild(listItem);
+            });
+        }
+
+        function displayCompanyDetails(companyIndex) {
+            const company = companiesData[companyIndex];
+            companyDetailTitleElement.textContent = "Détails de l'Entreprise"; // Reset title
+            
+            if (!company) {
+                 companyDetailsElement.innerHTML = '<p class="italic text-gray-500 p-4 text-center">Erreur : Données de l\'entreprise non trouvées.</p>';
+                 if (radarChartInstance) { radarChartInstance.destroy(); radarChartInstance = null; }
+                 const chartContainer = document.getElementById('radarChartContainer');
+                 if(chartContainer) chartContainer.innerHTML = '<canvas id="radarChart"></canvas>'; // Ensure canvas placeholder is there
+                 downloadSheetButton.disabled = true;
+                 return;
+            }
+            
+            companyDetailTitleElement.textContent = `Fiche TPE : ${company["Raison sociale - Définitive"] || company["Entreprise"]}`;
+            const na = '<span class="text-xs text-gray-400 italic">N/A</span>'; 
+
+            companyDetailsElement.innerHTML = `
+                <h3 class="text-xl font-bold text-indigo-700 mb-4 pb-2 border-b border-gray-200">${company["Raison sociale - Définitive"] || company["Entreprise"]}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5 text-sm text-gray-700">
+                    <div class="detail-item">${svgIcons.user}<strong>Représentant:</strong> <span class="ml-1">${company["nom du représentant"] || na}</span></div>
+                    <div class="detail-item">${svgIcons.globe}<strong>Région:</strong> <span class="ml-1">${company["Région"] || na}</span></div>
+                    <div class="detail-item">${svgIcons.phone}<strong>Téléphone:</strong> <span class="ml-1">${(company["n de téléphone"] || "").replace(/\n/g, ', ') || na}</span></div>
+                    <div class="detail-item">${svgIcons.globe}<strong>Province:</strong> <span class="ml-1">${company["Provnce"] && company["Provnce"].toString().trim() !== "0" ? company["Provnce"] : na}</span></div>
+                    <div class="detail-item">${svgIcons.mail}<strong>Email:</strong> <span class="ml-1">${(company["email"] || "").replace(/\n/g, ', ') || na}</span></div>
+                    <div class="detail-item">${svgIcons.briefcase}<strong>Secteur:</strong> <span class="ml-1">${company["Secteur"] || na}</span></div>
+                    <div class="detail-item">${svgIcons.academicCap}<strong>Qualité répondant:</strong> <span class="ml-1">${company["Qualité du répondant"] || na}</span></div>
+                    <div class="detail-item">${svgIcons.identification}<strong>Statut:</strong> <span class="ml-1">${company["Statut"] || na}</span></div>
+                    <div class="detail-item">${svgIcons.chartBar}<strong>Moyenne globale:</strong> <span class="ml-1 font-semibold text-indigo-700">${company["Moyenne globale "] ? company["Moyenne globale "].toFixed(2) : na}</span></div>
+                    <div class="detail-item">${svgIcons.tag}<strong>Profil Digital:</strong> <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full ${getProfileBadgeColor(company["Profil de maturité digitale "])}">${company["Profil de maturité digitale "] || na}</span></div>
+                    <div class="detail-item md:col-span-2">${svgIcons.currencyDollar}<strong>Chiffre d'Affaires:</strong> <span class="ml-1">${company["Chiffre d'affaires "] || na}</span></div>
+                    <div class="detail-item">${company["Feminine"] === "Oui" ? svgIcons.femaleUser : svgIcons.user }<strong>Entreprise Féminine:</strong> <span class="ml-1">${company["Feminine"] || na}</span></div>
+                    <div class="detail-item">${svgIcons.language}<strong>Langue:</strong> <span class="ml-1">${company["Langue"] || na}</span></div>
+                </div>
+            `;
+
+            const radarLabels = ["Stratégie", "Culture & RH", "Relation Client", "Processus", "Technologies", "Sécurité & Données"];
+            const radarDataValues = [
+                company["Stratégie"] || 0,
+                company["Culture & RH"] || 0,
+                company["Relation Client"] || 0,
+                company["Processus"] || 0,
+                company["Technologies"] || 0,
+                company["Sécurité & Données"] || 0
+            ];
+
+            if (radarChartInstance) {
+                radarChartInstance.destroy();
+                radarChartInstance = null;
+            }
+            
+            const chartContainer = document.getElementById('radarChartContainer');
+            const currentCanvas = document.getElementById('radarChart');
+            if (currentCanvas) currentCanvas.remove(); 
+
+            const newCanvas = document.createElement('canvas');
+            newCanvas.id = 'radarChart';
+            chartContainer.appendChild(newCanvas);
+            const newCtx = newCanvas.getContext('2d');
+
+            radarChartInstance = new Chart(newCtx, {
+                type: 'radar',
+                data: {
+                    labels: radarLabels,
+                    datasets: [{
+                        label: `Profil Digital (${(company["Moyenne globale "] || 0).toFixed(1)}%)`,
+                        data: radarDataValues,
+                        fill: true,
+                        backgroundColor: 'rgba(79, 70, 229, 0.15)', 
+                        borderColor: 'rgba(79, 70, 229, 0.8)',       
+                        pointBackgroundColor: 'rgb(79, 70, 229)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgb(79, 70, 229)',
+                        borderWidth: 1.5, // Thinner border
+                        pointRadius: 3, // Smaller points
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: { /* Chart options from previous version are good, slight adjustments */
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { display: true, color: 'rgba(0, 0, 0, 0.07)' },
+                            suggestedMin: 0,
+                            suggestedMax: 100,
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }, 
+                            pointLabels: {
+                                font: { size: 10.5, weight: '500' }, 
+                                color: '#4b5563' // Gray-600
+                            },
+                            ticks: {
+                                backdropColor: 'transparent',
+                                stepSize: 20,
+                                font: { size: 9 }, 
+                                color: '#6b7280' 
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top', 
+                            align: 'center',
+                            labels: {
+                                font: { size: 12.5, weight: '500' },
+                                color: '#1f2937', 
+                                padding: 15,
+                                boxWidth: 12,
+                                usePointStyle: true,
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 41, 59, 0.85)', // Slate-800
+                            titleFont: { size: 13, weight: 'bold' },
+                            bodyFont: { size: 11.5 },
+                            padding: 10,
+                            cornerRadius: 6,
+                            borderColor: 'rgba(79, 70, 229, 0.5)',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed.r !== null) {
+                                        label += context.parsed.r.toFixed(1) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function getProfileBadgeColor(profile) {
+            if (!profile) return 'bg-gray-100 text-gray-600 border border-gray-300';
+            switch (profile.toLowerCase()) {
+                case 'émergent': return 'bg-yellow-100 text-yellow-700 border border-yellow-300';
+                case 'challenger': return 'bg-green-100 text-green-700 border border-green-300';
+                case 'débutant': return 'bg-red-100 text-red-700 border border-red-300';
+                case 'leader': return 'bg-blue-100 text-blue-700 border border-blue-300';
+                default: return 'bg-gray-100 text-gray-600 border border-gray-300';
+            }
+        }
+        
+        downloadSheetButton.addEventListener('click', () => {
+            if (selectedCompanyIndex === -1 || !companiesData[selectedCompanyIndex]) {
+                alert("Veuillez d'abord sélectionner une entreprise valide.");
+                return;
+            }
+            const company = companiesData[selectedCompanyIndex];
+            const ficheElementOriginal = document.getElementById('ficheTPEForDownload');
+            
+            // Create a clone for styling and rendering
+            const ficheClone = ficheElementOriginal.cloneNode(true);
+            ficheClone.classList.add('printable-fiche'); // Add class for print styles
+            ficheClone.style.position = 'absolute';
+            ficheClone.style.left = '-9999px'; // Position off-screen
+            ficheClone.style.top = '-9999px';
+            document.body.appendChild(ficheClone);
+
+            // Re-render chart in the clone for better control (if needed, html2canvas should pick it up)
+            const clonedChartContainer = ficheClone.querySelector('#radarChartContainer');
+            const clonedCanvas = clonedChartContainer.querySelector('canvas');
+            if (clonedCanvas) clonedCanvas.remove(); // Remove placeholder
+            
+            const tempCanvas = document.createElement('canvas');
+            clonedChartContainer.appendChild(tempCanvas);
+            const clonedCtx = tempCanvas.getContext('2d');
+
+            // Temporarily hide the original chart legend for download to avoid clutter, if it's part of the captured canvas
+            const originalLegendDisplay = radarChartInstance.options.plugins.legend.display;
+            radarChartInstance.options.plugins.legend.display = false; // Hide legend for capture
+            radarChartInstance.update('none'); // Apply change
+
+            // Redraw chart on the temporary canvas with print-friendly options
+            new Chart(clonedCtx, {
+                type: 'radar',
+                data: radarChartInstance.data, // Use existing data
+                options: { // Simplified options for printing
+                    ...radarChartInstance.options, // Base options
+                    responsive: false, // Important for fixed size rendering
+                    animation: false,
+                    devicePixelRatio: 2, // Higher DPI for print
+                    plugins: {
+                        ...radarChartInstance.options.plugins,
+                        legend: { display: true, position: 'bottom', labels:{font:{size:10}}}, // Smaller legend for print
+                        tooltip: { enabled: false } // Disable tooltips for print
+                    },
+                    scales: {
+                        r: {
+                           ...radarChartInstance.options.scales.r,
+                            pointLabels: { font: { size: 9.5 }, color: '#333' },
+                            ticks: { font: { size: 8.5 }, color: '#555', backdropColor: 'white' }
+                        }
+                    }
+                }
+            });
+
+
+            html2canvas(ficheClone, { 
+                scale: 2.5, // Higher scale for better clarity
+                useCORS: true,
+                logging: false,
+                width: 800, // Fixed width for the output image
+                windowWidth: 800, // Simulate window width
+                removeContainer: true // Removes the clone after capture
+            }).then(canvas => {
+                const image = canvas.toDataURL('image/png', 0.95); // Slightly better quality PNG
+                const link = document.createElement('a');
+                const companyName = (company["Raison sociale - Définitive"] || company["Entreprise"] || "fiche-tpe").replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                link.download = `fiche_tpe_${companyName}.png`;
+                link.href = image;
+                link.click();
+                
+                document.body.removeChild(ficheClone); // Clean up clone
+                radarChartInstance.options.plugins.legend.display = originalLegendDisplay; // Restore legend
+                radarChartInstance.update('none');
+
+
+            }).catch(err => {
+                console.error("Erreur html2canvas:", err);
+                document.body.removeChild(ficheClone); // Clean up clone on error
+                radarChartInstance.options.plugins.legend.display = originalLegendDisplay; // Restore legend
+                radarChartInstance.update('none');
+            });
+        });
+        
+        resetFiltersButton.addEventListener('click', () => {
+            searchCompanyInput.value = '';
+            filterRegionElement.value = '';
+            filterSecteurElement.value = '';
+            filterProfilElement.value = '';
+            filterStatutElement.value = '';
+            filterCAElement.value = '';
+            filterLangueElement.value = '';
+
+            selectedCompanyIndex = -1; 
+            companyDetailTitleElement.textContent = "Détails de l'Entreprise";
+            companyDetailsElement.innerHTML = '<p class="italic text-gray-500 p-4 text-center">Sélectionnez une entreprise dans la liste pour afficher ses détails et son profil.</p>';
+            
+            if (radarChartInstance) {
+                radarChartInstance.destroy();
+                radarChartInstance = null; 
+            }
+            const chartContainer = document.getElementById('radarChartContainer');
+            chartContainer.innerHTML = '<canvas id="radarChart"></canvas>';
+
+            downloadSheetButton.disabled = true;
+            document.querySelectorAll('#companyList li').forEach(li => li.classList.remove('selected'));
+            filterAndDisplayCompanies();
+        });
+        
+        // Add event listeners for new filters
+        [searchCompanyInput, filterRegionElement, filterSecteurElement, filterProfilElement, filterStatutElement, filterCAElement, filterLangueElement].forEach(el => {
+            const eventType = el.tagName === 'SELECT' ? 'change' : 'input';
+            el.addEventListener(eventType, filterAndDisplayCompanies);
+        });
+
+        // Initialisation
+        if (companiesData.length > 0) {
+            populateFilters();
+            filterAndDisplayCompanies(); 
+            downloadSheetButton.disabled = true; 
+            if (companiesData.length > 0 && companiesData[0]) { 
+                 selectedCompanyIndex = 0;
+                 displayCompanyDetails(0);
+                 const firstListItem = companyListElement.querySelector('li');
+                 if(firstListItem) firstListItem.classList.add('selected');
+                 downloadSheetButton.disabled = false;
+            }
+        } else {
+            companyListElement.innerHTML = '<li class="text-gray-500 p-3 text-center">Veuillez coller vos données JSON dans le script pour commencer.</li>';
+            companyDetailsElement.innerHTML = '<p class="italic text-gray-500 p-4 text-center">Aucune donnée à afficher. Veuillez vérifier la source de données (section `rawData` dans le script).</p>';
+            companyCountElement.textContent = '0 affichées';
+            updateGlobalStats([]); 
+            downloadSheetButton.disabled = true;
+            console.warn("rawData est vide. Veuillez coller vos données JSON dans le script.");
+        }
+
+    </script>
+</body>
+</html>
