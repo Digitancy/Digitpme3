@@ -8,8 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- html2canvas via CDN for downloading feature -->
+    <!-- html2canvas via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- jsPDF via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -86,40 +88,43 @@
             color: #3b82f6; /* Blue-500 */
         }
 
-        /* Styles for the downloaded image - applied dynamically */
+        /* Styles for the downloaded image/PDF content - applied dynamically */
         .printable-fiche {
             font-family: Arial, sans-serif; /* Standard font for better compatibility */
-            padding: 25px !important;
+            padding: 20px !important; /* Adjusted padding */
             background-color: white !important;
             border: 1px solid #ccc !important;
             box-shadow: none !important; /* Remove shadow for print */
             width: 800px !important; /* Fixed width for consistent PDF output */
+            box-sizing: border-box;
         }
         .printable-fiche h3 {
-            font-size: 22px !important;
+            font-size: 20px !important; /* Adjusted font size */
             color: #111827 !important; /* Gray-900 */
             text-align: center;
-            margin-bottom: 20px !important;
-            padding-bottom: 10px !important;
+            margin-bottom: 18px !important; /* Adjusted margin */
+            padding-bottom: 8px !important; /* Adjusted padding */
             border-bottom: 2px solid #3b82f6 !important;
         }
         .printable-fiche .detail-item {
-            font-size: 12px !important;
-            margin-bottom: 6px !important;
+            font-size: 11px !important; /* Adjusted font size */
+            margin-bottom: 5px !important; /* Adjusted margin */
         }
         .printable-fiche .detail-item strong {
             color: #374151 !important; /* Gray-700 */
-            min-width: 150px; /* Ensure alignment of values */
+            min-width: 140px; /* Adjusted min-width */
             display: inline-block;
         }
          .printable-fiche .detail-item svg {
             color: #3b82f6 !important;
-            width: 14px !important;
-            height: 14px !important;
+            width: 12px !important; /* Adjusted size */
+            height: 12px !important; /* Adjusted size */
         }
         .printable-fiche #radarChartContainer { /* Chart specific styles for print */
-            margin-top: 20px !important;
+            margin-top: 15px !important; /* Adjusted margin */
             border: 1px solid #eee !important;
+            padding: 5px !important; /* Reduce padding for chart in PDF */
+            /* Ensure chart canvas itself fits */
         }
         .printable-fiche .grid { /* Simplify grid for printing */
             display: block !important;
@@ -160,7 +165,7 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div class="lg:col-span-4 bg-white p-5 rounded-xl shadow-lg flex flex-col max-h-[calc(100vh-200px)]">
+            <div class="lg:col-span-4 bg-white p-5 rounded-xl shadow-lg flex flex-col max-h-[calc(100vh-120px)]">
                 <div class="flex-shrink-0">
                     <h2 class="text-xl font-semibold text-gray-700 mb-1">Filtres & Recherche</h2>
                     <p class="text-xs text-gray-500 mb-4">Affinez votre sélection d'entreprises.</p>
@@ -226,7 +231,7 @@
                     <h2 id="companyDetailTitle" class="text-xl lg:text-2xl font-semibold text-gray-800 mb-2 sm:mb-0">Détails de l'Entreprise</h2>
                     <button id="downloadSheetButton" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow hover:shadow-md transition-all">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-                        Télécharger Fiche
+                        Télécharger Fiche PDF
                     </button>
                 </div>
                 
@@ -5242,6 +5247,9 @@
 ];
         // --- END: COLLER VOS DONNÉES JSON ICI ---
 
+        // Access jsPDF using the UMD global name
+        const { jsPDF } = window.jspdf;
+
         const companiesData = rawData.filter(item => item && typeof item === 'object' && item.hasOwnProperty('Entreprise') && item.Entreprise !== null);
 
         const companyListElement = document.getElementById('companyList');
@@ -5279,7 +5287,7 @@
             academicCap : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.998.998 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.01 9.383L10 12.528l6.99-3.145A.999.999 0 0117.545 9V6.44a1 1 0 00-1.095-.986l-1.44-.411a1 1 0 00-.86.495L10 8.118l-4.15-1.594a1 1 0 00-.858-.495l-1.44.411A1 1 0 002.455 6.44V9a.999.999 0 01.555.883zM10 18a7 7 0 100-14 7 7 0 000 14z" /></svg>',
             identification: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 00-1 1v1a1 1 0 002 0V3a1 1 0 00-1-1zM4 4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1H4zm10 2a1 1 0 100-2H6a1 1 0 100 2h8z" clip-rule="evenodd" /></svg>',
             language: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7 2a1 1 0 00-.707 1.707L7.586 5H4a1 1 0 000 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414l-3-3A1 1 0 007 2zm9 4a1 1 0 011-1h3a1 1 0 110 2h-3a1 1 0 01-1-1zm-1 4a1 1 0 011-1h3a1 1 0 110 2h-3a1 1 0 01-1-1zm-1 4a1 1 0 011-1h3a1 1 0 110 2h-3a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>',
-            femaleUser: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-pink-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>', // Placeholder, replace with actual female icon if needed
+            femaleUser: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-pink-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>', 
         };
 
         function populateFilters() {
@@ -5300,10 +5308,7 @@
             });
             
             const populateSelect = (element, items) => {
-                // Clear existing options except the first one ("Tous/Toutes")
-                while (element.options.length > 1) {
-                    element.remove(1);
-                }
+                while (element.options.length > 1) { element.remove(1); }
                 Array.from(items).sort((a,b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'})).forEach(item => {
                     const option = document.createElement('option');
                     option.value = item;
@@ -5412,13 +5417,13 @@
 
         function displayCompanyDetails(companyIndex) {
             const company = companiesData[companyIndex];
-            companyDetailTitleElement.textContent = "Détails de l'Entreprise"; // Reset title
+            companyDetailTitleElement.textContent = "Détails de l'Entreprise"; 
             
             if (!company) {
                  companyDetailsElement.innerHTML = '<p class="italic text-gray-500 p-4 text-center">Erreur : Données de l\'entreprise non trouvées.</p>';
                  if (radarChartInstance) { radarChartInstance.destroy(); radarChartInstance = null; }
                  const chartContainer = document.getElementById('radarChartContainer');
-                 if(chartContainer) chartContainer.innerHTML = '<canvas id="radarChart"></canvas>'; // Ensure canvas placeholder is there
+                 if(chartContainer) chartContainer.innerHTML = '<canvas id="radarChart"></canvas>';
                  downloadSheetButton.disabled = true;
                  return;
             }
@@ -5455,19 +5460,16 @@
                 company["Sécurité & Données"] || 0
             ];
 
-            if (radarChartInstance) {
-                radarChartInstance.destroy();
-                radarChartInstance = null;
-            }
+            if (radarChartInstance) { radarChartInstance.destroy(); radarChartInstance = null; }
             
             const chartContainer = document.getElementById('radarChartContainer');
-            const currentCanvas = document.getElementById('radarChart');
-            if (currentCanvas) currentCanvas.remove(); 
+            const currentCanvasEl = document.getElementById('radarChart');
+            if (currentCanvasEl) currentCanvasEl.remove(); 
 
-            const newCanvas = document.createElement('canvas');
-            newCanvas.id = 'radarChart';
-            chartContainer.appendChild(newCanvas);
-            const newCtx = newCanvas.getContext('2d');
+            const newCanvasEl = document.createElement('canvas');
+            newCanvasEl.id = 'radarChart';
+            chartContainer.appendChild(newCanvasEl);
+            const newCtx = newCanvasEl.getContext('2d');
 
             radarChartInstance = new Chart(newCtx, {
                 type: 'radar',
@@ -5483,12 +5485,12 @@
                         pointBorderColor: '#fff',
                         pointHoverBackgroundColor: '#fff',
                         pointHoverBorderColor: 'rgb(79, 70, 229)',
-                        borderWidth: 1.5, // Thinner border
-                        pointRadius: 3, // Smaller points
+                        borderWidth: 1.5, 
+                        pointRadius: 3, 
                         pointHoverRadius: 5
                     }]
                 },
-                options: { /* Chart options from previous version are good, slight adjustments */
+                options: { 
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
@@ -5497,45 +5499,23 @@
                             suggestedMin: 0,
                             suggestedMax: 100,
                             grid: { color: 'rgba(0, 0, 0, 0.05)' }, 
-                            pointLabels: {
-                                font: { size: 10.5, weight: '500' }, 
-                                color: '#4b5563' // Gray-600
-                            },
-                            ticks: {
-                                backdropColor: 'transparent',
-                                stepSize: 20,
-                                font: { size: 9 }, 
-                                color: '#6b7280' 
-                            }
+                            pointLabels: { font: { size: 10.5, weight: '500' }, color: '#4b5563' },
+                            ticks: { backdropColor: 'transparent', stepSize: 20, font: { size: 9 }, color: '#6b7280' }
                         }
                     },
                     plugins: {
                         legend: {
-                            position: 'top', 
-                            align: 'center',
-                            labels: {
-                                font: { size: 12.5, weight: '500' },
-                                color: '#1f2937', 
-                                padding: 15,
-                                boxWidth: 12,
-                                usePointStyle: true,
-                            }
+                            position: 'top', align: 'center',
+                            labels: { font: { size: 12.5, weight: '500' }, color: '#1f2937', padding: 15, boxWidth: 12, usePointStyle: true, }
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(30, 41, 59, 0.85)', // Slate-800
-                            titleFont: { size: 13, weight: 'bold' },
-                            bodyFont: { size: 11.5 },
-                            padding: 10,
-                            cornerRadius: 6,
-                            borderColor: 'rgba(79, 70, 229, 0.5)',
-                            borderWidth: 1,
+                            backgroundColor: 'rgba(30, 41, 59, 0.85)', titleFont: { size: 13, weight: 'bold' }, bodyFont: { size: 11.5 },
+                            padding: 10, cornerRadius: 6, borderColor: 'rgba(79, 70, 229, 0.5)', borderWidth: 1,
                             callbacks: {
                                 label: function(context) {
                                     let label = context.label || '';
                                     if (label) { label += ': '; }
-                                    if (context.parsed.r !== null) {
-                                        label += context.parsed.r.toFixed(1) + '%';
-                                    }
+                                    if (context.parsed.r !== null) { label += context.parsed.r.toFixed(1) + '%'; }
                                     return label;
                                 }
                             }
@@ -5558,84 +5538,105 @@
         
         downloadSheetButton.addEventListener('click', () => {
             if (selectedCompanyIndex === -1 || !companiesData[selectedCompanyIndex]) {
-                alert("Veuillez d'abord sélectionner une entreprise valide.");
+                console.warn("Veuillez d'abord sélectionner une entreprise valide."); 
                 return;
             }
             const company = companiesData[selectedCompanyIndex];
             const ficheElementOriginal = document.getElementById('ficheTPEForDownload');
             
-            // Create a clone for styling and rendering
             const ficheClone = ficheElementOriginal.cloneNode(true);
-            ficheClone.classList.add('printable-fiche'); // Add class for print styles
+            ficheClone.classList.add('printable-fiche'); 
             ficheClone.style.position = 'absolute';
-            ficheClone.style.left = '-9999px'; // Position off-screen
+            ficheClone.style.left = '-9999px'; 
             ficheClone.style.top = '-9999px';
             document.body.appendChild(ficheClone);
 
-            // Re-render chart in the clone for better control (if needed, html2canvas should pick it up)
             const clonedChartContainer = ficheClone.querySelector('#radarChartContainer');
             const clonedCanvas = clonedChartContainer.querySelector('canvas');
-            if (clonedCanvas) clonedCanvas.remove(); // Remove placeholder
+            if (clonedCanvas) clonedCanvas.remove(); 
             
             const tempCanvas = document.createElement('canvas');
+            // Set canvas dimensions for chart rendering for PDF
+            // These might need adjustment for optimal chart size in PDF
+            tempCanvas.width = 700; // Adjust as needed
+            tempCanvas.height = 400; // Adjust as needed
             clonedChartContainer.appendChild(tempCanvas);
             const clonedCtx = tempCanvas.getContext('2d');
 
-            // Temporarily hide the original chart legend for download to avoid clutter, if it's part of the captured canvas
             const originalLegendDisplay = radarChartInstance.options.plugins.legend.display;
-            radarChartInstance.options.plugins.legend.display = false; // Hide legend for capture
-            radarChartInstance.update('none'); // Apply change
+            // radarChartInstance.options.plugins.legend.display = false; // Keep legend for PDF
+            // radarChartInstance.update('none'); 
 
-            // Redraw chart on the temporary canvas with print-friendly options
+            // Chart instance for PDF rendering
             new Chart(clonedCtx, {
                 type: 'radar',
-                data: radarChartInstance.data, // Use existing data
-                options: { // Simplified options for printing
-                    ...radarChartInstance.options, // Base options
-                    responsive: false, // Important for fixed size rendering
+                data: radarChartInstance.data,
+                options: { 
+                    ...radarChartInstance.options, 
+                    responsive: false, 
                     animation: false,
-                    devicePixelRatio: 2, // Higher DPI for print
+                    devicePixelRatio: 3, // Increased for PDF sharpness
                     plugins: {
                         ...radarChartInstance.options.plugins,
-                        legend: { display: true, position: 'bottom', labels:{font:{size:10}}}, // Smaller legend for print
-                        tooltip: { enabled: false } // Disable tooltips for print
+                        legend: { display: true, position: 'bottom', labels:{font:{size:9.5}}}, 
+                        tooltip: { enabled: false } 
                     },
                     scales: {
                         r: {
                            ...radarChartInstance.options.scales.r,
-                            pointLabels: { font: { size: 9.5 }, color: '#333' },
-                            ticks: { font: { size: 8.5 }, color: '#555', backdropColor: 'white' }
+                            pointLabels: { font: { size: 9 }, color: '#222' }, // Slightly smaller/darker for PDF
+                            ticks: { font: { size: 8 }, color: '#444', backdropColor: 'white' }
                         }
                     }
                 }
             });
 
-
             html2canvas(ficheClone, { 
-                scale: 2.5, // Higher scale for better clarity
+                scale: 2, // html2canvas scale for image generation (jsPDF will handle PDF scaling)
                 useCORS: true,
-                logging: false,
-                width: 800, // Fixed width for the output image
-                windowWidth: 800, // Simulate window width
-                removeContainer: true // Removes the clone after capture
+                logging: true, // Enable for debugging html2canvas issues
+                width: ficheClone.offsetWidth, // Use the actual width of the clone
+                height: ficheClone.offsetHeight, // Use the actual height of the clone
+                windowWidth: ficheClone.scrollWidth,
+                windowHeight: ficheClone.scrollHeight,
+                removeContainer: true 
             }).then(canvas => {
-                const image = canvas.toDataURL('image/png', 0.95); // Slightly better quality PNG
-                const link = document.createElement('a');
-                const companyName = (company["Raison sociale - Définitive"] || company["Entreprise"] || "fiche-tpe").replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                link.download = `fiche_tpe_${companyName}.png`;
-                link.href = image;
-                link.click();
+                const imgData = canvas.toDataURL('image/jpeg', 0.9); // Use JPEG for PDF, often smaller
                 
-                document.body.removeChild(ficheClone); // Clean up clone
-                radarChartInstance.options.plugins.legend.display = originalLegendDisplay; // Restore legend
-                radarChartInstance.update('none');
+                // PDF Generation
+                const pdf = new jsPDF({
+                    orientation: 'p', // portrait
+                    unit: 'px', // units
+                    format: [canvas.width, canvas.height] // page size based on canvas, or set fixed like 'a4'
+                });
 
+                // Add image to PDF
+                // The x,y,width,height parameters for addImage can be adjusted if the image
+                // doesn't fit well. For example, to scale it to fit page width:
+                // const pdfWidth = pdf.internal.pageSize.getWidth();
+                // const pdfHeight = pdf.internal.pageSize.getHeight();
+                // const ratio = Math.min(pdfWidth / canvas.width, pdfHeight / canvas.height);
+                // const imgWidth = canvas.width * ratio;
+                // const imgHeight = canvas.height * ratio;
+                // pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+                
+                pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+
+
+                const companyName = (company["Raison sociale - Définitive"] || company["Entreprise"] || "fiche-tpe").replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                pdf.save(`fiche_tpe_${companyName}.pdf`);
+                
+                document.body.removeChild(ficheClone); 
+                // radarChartInstance.options.plugins.legend.display = originalLegendDisplay; 
+                // radarChartInstance.update('none');
 
             }).catch(err => {
-                console.error("Erreur html2canvas:", err);
-                document.body.removeChild(ficheClone); // Clean up clone on error
-                radarChartInstance.options.plugins.legend.display = originalLegendDisplay; // Restore legend
-                radarChartInstance.update('none');
+                console.error("Erreur html2canvas ou jsPDF:", err);
+                if (document.body.contains(ficheClone)) { // Check if clone exists before removing
+                     document.body.removeChild(ficheClone);
+                }
+                // radarChartInstance.options.plugins.legend.display = originalLegendDisplay; 
+                // radarChartInstance.update('none');
             });
         });
         
@@ -5652,10 +5653,7 @@
             companyDetailTitleElement.textContent = "Détails de l'Entreprise";
             companyDetailsElement.innerHTML = '<p class="italic text-gray-500 p-4 text-center">Sélectionnez une entreprise dans la liste pour afficher ses détails et son profil.</p>';
             
-            if (radarChartInstance) {
-                radarChartInstance.destroy();
-                radarChartInstance = null; 
-            }
+            if (radarChartInstance) { radarChartInstance.destroy(); radarChartInstance = null; }
             const chartContainer = document.getElementById('radarChartContainer');
             chartContainer.innerHTML = '<canvas id="radarChart"></canvas>';
 
@@ -5664,13 +5662,11 @@
             filterAndDisplayCompanies();
         });
         
-        // Add event listeners for new filters
         [searchCompanyInput, filterRegionElement, filterSecteurElement, filterProfilElement, filterStatutElement, filterCAElement, filterLangueElement].forEach(el => {
             const eventType = el.tagName === 'SELECT' ? 'change' : 'input';
             el.addEventListener(eventType, filterAndDisplayCompanies);
         });
 
-        // Initialisation
         if (companiesData.length > 0) {
             populateFilters();
             filterAndDisplayCompanies(); 
